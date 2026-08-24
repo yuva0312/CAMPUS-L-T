@@ -17,6 +17,20 @@ const inMemoryLostItems = [];
 const inMemoryFoundItems = [];
 const inMemoryClaims = [];
 const inMemoryNotifications = [];
+const inMemoryUsers = [
+  {
+    id: 'USR-PAVI',
+    _id: 'USR-PAVI',
+    fullName: 'Pavi',
+    studentId: 'PAVI1234',
+    email: '231501177@rajalakshmi.edu.in',
+    phone: '9600929978',
+    department: 'Artificial Intelligence & Machine Learning',
+    year: '4th Year (Senior)',
+    role: 'student',
+    createdAt: new Date(),
+  },
+];
 
 const loadInMemoryStore = () => {
   try {
@@ -27,6 +41,10 @@ const loadInMemoryStore = () => {
       if (Array.isArray(parsed.inMemoryFoundItems)) inMemoryFoundItems.push(...parsed.inMemoryFoundItems);
       if (Array.isArray(parsed.inMemoryClaims)) inMemoryClaims.push(...parsed.inMemoryClaims);
       if (Array.isArray(parsed.inMemoryNotifications)) inMemoryNotifications.push(...parsed.inMemoryNotifications);
+      if (Array.isArray(parsed.inMemoryUsers) && parsed.inMemoryUsers.length > 0) {
+        inMemoryUsers.length = 0;
+        inMemoryUsers.push(...parsed.inMemoryUsers);
+      }
     }
   } catch (err) {
     console.error('Error loading memory store data file:', err.message);
@@ -40,6 +58,7 @@ const saveInMemoryStore = () => {
       inMemoryFoundItems,
       inMemoryClaims,
       inMemoryNotifications,
+      inMemoryUsers,
     };
     fs.writeFileSync(DATA_FILE, JSON.stringify(payload, null, 2), 'utf8');
   } catch (err) {
@@ -55,6 +74,7 @@ module.exports = {
   inMemoryFoundItems,
   inMemoryClaims,
   inMemoryNotifications,
+  inMemoryUsers,
   saveInMemoryStore,
 };
 

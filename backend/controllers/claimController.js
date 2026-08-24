@@ -84,6 +84,17 @@ const createClaim = async (req, res) => {
       });
     }
 
+    const userProfile = {
+      _id: studentId,
+      id: studentId,
+      fullName: req.user.fullName || 'Pavi',
+      studentId: req.user.studentId || 'PAVI1234',
+      email: req.user.email || '231501177@rajalakshmi.edu.in',
+      phone: req.user.phone || '9600929978',
+      department: req.user.department || 'Artificial Intelligence & Machine Learning',
+      year: req.user.year || '4th Year (Senior)',
+    };
+
     let foundItem = null;
     let lostItem = null;
 
@@ -112,11 +123,19 @@ const createClaim = async (req, res) => {
         matchId: matchId || `match_${Date.now()}`,
         verificationAnswers,
         verificationScore,
-        status: 'pending', // Rule: Claims are NEVER auto-approved based on score alone. Must be reviewed by team.
+        status: 'pending',
       });
 
-      // Synchronize into inMemoryStore so admin and student portals ALWAYS see it immediately
+      // Synchronize into inMemoryStore so admin and student portals ALWAYS see exact student profile immediately
       const claimObj = claim.toObject ? claim.toObject() : { ...claim };
+      claimObj.studentId = userProfile;
+      claimObj.studentName = userProfile.fullName;
+      claimObj.studentEmail = userProfile.email;
+      claimObj.studentPhone = userProfile.phone;
+      claimObj.studentRegId = userProfile.studentId;
+      claimObj.studentDept = userProfile.department;
+      claimObj.studentYear = userProfile.year;
+
       const existingIdx = inMemoryClaims.findIndex((c) => String(c._id) === String(claimObj._id));
       if (existingIdx >= 0) {
         inMemoryClaims[existingIdx] = claimObj;
@@ -138,13 +157,19 @@ const createClaim = async (req, res) => {
       return res.status(201).json({
         success: true,
         message: 'Your verification has been submitted. Waiting for Lost & Found Team review.',
-        data: claim,
+        data: claimObj,
       });
     } else {
       // In-memory dev fallback
       const newClaim = {
         _id: 'CLAIM-' + Date.now(),
-        studentId: studentId.toString(),
+        studentId: userProfile,
+        studentName: userProfile.fullName,
+        studentEmail: userProfile.email,
+        studentPhone: userProfile.phone,
+        studentRegId: userProfile.studentId,
+        studentDept: userProfile.department,
+        studentYear: userProfile.year,
         lostItemId,
         foundItemId,
         matchId: matchId || `match_${Date.now()}`,

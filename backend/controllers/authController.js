@@ -2,35 +2,27 @@ const User = require('../models/User');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 
-// In-memory fallback user store when MongoDB is not yet connected (dev mode)
+const { inMemoryUsers, saveInMemoryStore } = require('../utils/inMemoryStore');
+
+// In-memory fallback user store default password hash
 const defaultHash = bcrypt.hashSync('password123', 10);
 
-const inMemoryUsers = [
-  {
-    id: 'USR-101',
-    fullName: 'Yuvashree Kumaran',
-    studentId: 'Yu031205',
-    email: 'yuva@college.edu',
-    phone: '9876543210',
+// Ensure default student users exist in memory store
+if (!inMemoryUsers.some((u) => u.studentId === 'PAVI1234' || u.fullName === 'Pavi')) {
+  inMemoryUsers.push({
+    id: 'USR-PAVI',
+    _id: 'USR-PAVI',
+    fullName: 'Pavi',
+    studentId: 'PAVI1234',
+    email: '231501177@rajalakshmi.edu.in',
+    phone: '9600929978',
     department: 'Artificial Intelligence & Machine Learning',
     year: '4th Year (Senior)',
     password: defaultHash,
     role: 'student',
     createdAt: new Date(),
-  },
-  {
-    id: 'USR-102',
-    fullName: 'John Doe',
-    studentId: 'JO12345',
-    email: 'jo12345@campus.edu',
-    phone: '+91 91234 56789',
-    department: 'Computer Science & Eng',
-    year: '2nd Year',
-    password: defaultHash,
-    role: 'student',
-    createdAt: new Date(),
-  },
-];
+  });
+}
 
 // Generate JWT token
 const generateToken = (id) => {
@@ -67,6 +59,8 @@ const registerUser = async (req, res) => {
     const mongoose = require('mongoose');
     const isDbConnected = mongoose.connection && mongoose.connection.readyState === 1;
 
+    let createdUserObj = null;
+
     if (isDbConnected) {
       // 2. Check if studentId already exists in MongoDB
       const existingStudentId = await User.findOne({ studentId: studentId.trim() });
@@ -90,7 +84,7 @@ const registerUser = async (req, res) => {
       const salt = await bcrypt.genSalt(10);
       const hashedPassword = await bcrypt.hash(password, salt);
 
-      // 5. Create and save user
+      // 5. Create and save user in DB
       const user = await User.create({
         fullName: fullName.trim(),
         studentId: studentId.trim(),
@@ -102,26 +96,22 @@ const registerUser = async (req, res) => {
         role: 'student',
       });
 
-      // 6. Return response without password
-      return res.status(201).json({
-        success: true,
-        message: 'Registration successful!',
-        user: {
-          id: user._id,
-          fullName: user.fullName,
-          studentId: user.studentId,
-          email: user.email,
-          phone: user.phone,
-          department: user.department,
-          year: user.year,
-          role: user.role,
-          createdAt: user.createdAt,
-        },
-      });
+      createdUserObj = {
+        id: user._id,
+        _id: user._id,
+        fullName: user.fullName,
+        studentId: user.studentId,
+        email: user.email,
+        phone: user.phone,
+        department: user.department,
+        year: user.year,
+        role: user.role,
+        createdAt: user.createdAt,
+      };
     } else {
       // Development mode fallback when MongoDB URI is placeholder
       const existingStudentId = inMemoryUsers.find(
-        (u) => u.studentId.toLowerCase() === studentId.trim().toLowerCase()
+        (u) => u.studentId && u.studentId.toLowerCase() === studentId.trim().toLowerCase()
       );
       if (existingStudentId) {
         return res.status(400).json({
@@ -131,7 +121,7 @@ const registerUser = async (req, res) => {
       }
 
       const existingEmail = inMemoryUsers.find(
-        (u) => u.email.toLowerCase() === email.trim().toLowerCase()
+        (u) => u.email && u.email.toLowerCase() === email.trim().toLowerCase()
       );
       if (existingEmail) {
         return res.status(400).json({
@@ -143,8 +133,10 @@ const registerUser = async (req, res) => {
       const salt = await bcrypt.genSalt(10);
       const hashedPassword = await bcrypt.hash(password, salt);
 
-      const newUser = {
-        id: Date.now().toString(),
+      const userId = `USR-${Date.now()}`;
+      createdUserObj = {
+        id: userId,
+        _id: userId,
         fullName: fullName.trim(),
         studentId: studentId.trim(),
         email: email.toLowerCase().trim(),
@@ -155,25 +147,34 @@ const registerUser = async (req, res) => {
         role: 'student',
         createdAt: new Date(),
       };
-
-      inMemoryUsers.push(newUser);
-
-      return res.status(201).json({
-        success: true,
-        message: 'Registration successful!',
-        user: {
-          id: newUser.id,
-          fullName: newUser.fullName,
-          studentId: newUser.studentId,
-          email: newUser.email,
-          phone: newUser.phone,
-          department: newUser.department,
-          year: newUser.year,
-          role: newUser.role,
-          createdAt: newUser.createdAt,
-        },
-      });
     }
+
+    // Always sync registered user into inMemoryUsers store
+    const existingIdx = inMemoryUsers.findIndex(
+      (u) => u.email === createdUserObj.email || u.studentId === createdUserObj.studentId
+    );
+    if (existingIdx >= 0) {
+      inMemoryUsers[existingIdx] = { ...inMemoryUsers[existingIdx], ...createdUserObj };
+    } else {
+      inMemoryUsers.push(createdUserObj);
+    }
+    saveInMemoryStore();
+
+    return res.status(201).json({
+      success: true,
+      message: 'Registration successful!',
+      user: {
+        id: createdUserObj.id || createdUserObj._id,
+        fullName: createdUserObj.fullName,
+        studentId: createdUserObj.studentId,
+        email: createdUserObj.email,
+        phone: createdUserObj.phone,
+        department: createdUserObj.department,
+        year: createdUserObj.year,
+        role: createdUserObj.role,
+        createdAt: createdUserObj.createdAt,
+      },
+    });
   } catch (error) {
     console.error('Registration Error:', error);
     return res.status(500).json({

@@ -381,12 +381,12 @@ const AdminClaims = () => {
             const studentRaw = claim.studentId;
             const answers = claim.verificationAnswers || {};
             const student = (typeof studentRaw === 'object' && studentRaw !== null) ? studentRaw : {
-              fullName: claim.studentName || 'Yuvashree Kumaran',
-              studentId: (typeof studentRaw === 'string' && !studentRaw.includes('admin') && studentRaw.length < 15) ? studentRaw : 'Yu031205',
-              email: claim.studentEmail || 'yuva@college.edu',
-              phone: claim.studentPhone || '9876543210',
-              department: 'Artificial Intelligence & Machine Learning',
-              year: '4th Year (Senior)',
+              fullName: claim.studentName || 'Pavi',
+              studentId: claim.studentRegId || 'PAVI1234',
+              email: claim.studentEmail || '231501177@rajalakshmi.edu.in',
+              phone: claim.studentPhone || '9600929978',
+              department: claim.studentDept || 'Artificial Intelligence & Machine Learning',
+              year: claim.studentYear || '4th Year (Senior)',
             };
 
             const foundRaw = claim.foundItemId;
@@ -401,11 +401,13 @@ const AdminClaims = () => {
               specialFeature: answers.additionalFeature || 'Butterfly wallpaper',
             };
 
-            const studentFullName = (student.fullName && student.fullName !== 'Student Claimant') ? student.fullName : 'Yuvashree Kumaran';
-            const studentRegId = (student.studentId && !student.studentId.includes('admin')) ? student.studentId : 'Yu031205';
-            const studentEmail = (student.email && !student.email.includes('student@campus')) ? student.email : 'yuva@college.edu';
-            const studentPhone = student.phone || '9876543210';
-            const studentDeptYear = student.department ? `${student.department} (${student.year || '4th Year (Senior)'})` : 'Artificial Intelligence & Machine Learning (4th Year (Senior))';
+            const studentFullName = student.fullName || claim.studentName || 'Registered Student';
+            const studentRegId = student.studentId || claim.studentRegId || 'N/A';
+            const studentEmail = student.email || claim.studentEmail || 'N/A';
+            const studentPhone = student.phone || claim.studentPhone || 'N/A';
+            const studentDeptYear = student.department
+              ? `${student.department}${student.year ? ` (${student.year})` : ''}`
+              : (claim.studentDept ? `${claim.studentDept}${claim.studentYear ? ` (${claim.studentYear})` : ''}` : 'Artificial Intelligence & Machine Learning (4th Year (Senior))');
 
             const foundItemName = found.itemName || (answers.brand ? `${answers.brand} Item` : 'Found Belonging');
             const foundCategory = found.category || 'Electronics';

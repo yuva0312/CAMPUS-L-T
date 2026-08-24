@@ -268,9 +268,14 @@ const getAllClaims = async (req, res) => {
       rawList.map(async (claimObj) => {
         try {
           // 1. Enrich Student Profile
-          if (!claimObj.studentId || typeof claimObj.studentId !== 'object' || !claimObj.studentId.fullName) {
-            const rawStudentId = claimObj.studentId;
-            let userDoc = null;
+          const { inMemoryUsers } = require('../utils/inMemoryStore');
+
+          const rawStudentId = claimObj.studentId;
+          let userDoc = null;
+
+          if (typeof rawStudentId === 'object' && rawStudentId !== null && rawStudentId.fullName) {
+            userDoc = rawStudentId;
+          } else {
             try {
               if (isDbConnected()) {
                 if (rawStudentId && mongoose.Types.ObjectId.isValid(rawStudentId)) {
@@ -281,27 +286,47 @@ const getAllClaims = async (req, res) => {
                     $or: [{ studentId: String(rawStudentId) }, { email: String(rawStudentId) }]
                   }).select('-password');
                 }
-                if (!userDoc) {
-                  userDoc = await User.findOne({ role: 'student' }).select('-password');
-                }
               }
             } catch (e) {
               userDoc = null;
             }
 
-            if (userDoc && userDoc.fullName) {
-              claimObj.studentId = userDoc;
-            } else {
-              claimObj.studentId = {
-                _id: rawStudentId || 'usr_yu031205',
-                fullName: 'Yuvashree Kumaran',
-                studentId: 'Yu031205',
-                email: 'yuva@college.edu',
-                phone: '9876543210',
-                department: 'Artificial Intelligence & Machine Learning',
-                year: '4th Year (Senior)',
-              };
+            if (!userDoc && rawStudentId) {
+              userDoc = inMemoryUsers.find(
+                (u) =>
+                  String(u.id) === String(rawStudentId) ||
+                  String(u._id) === String(rawStudentId) ||
+                  String(u.studentId) === String(rawStudentId) ||
+                  String(u.email) === String(rawStudentId)
+              );
             }
+
+            // Fallback to active registered user in store if unlinked demo claim
+            if (!userDoc && inMemoryUsers.length > 0) {
+              userDoc = inMemoryUsers[inMemoryUsers.length - 1];
+            }
+          }
+
+          if (userDoc && userDoc.fullName) {
+            claimObj.studentId = {
+              _id: userDoc._id || userDoc.id || 'usr_registered',
+              fullName: userDoc.fullName,
+              studentId: userDoc.studentId,
+              email: userDoc.email,
+              phone: userDoc.phone || '9600929978',
+              department: userDoc.department || 'Artificial Intelligence & Machine Learning',
+              year: userDoc.year || '4th Year (Senior)',
+            };
+          } else {
+            claimObj.studentId = {
+              _id: 'usr_pavi',
+              fullName: 'Pavi',
+              studentId: 'PAVI1234',
+              email: '231501177@rajalakshmi.edu.in',
+              phone: '9600929978',
+              department: 'Artificial Intelligence & Machine Learning',
+              year: '4th Year (Senior)',
+            };
           }
 
           // 2. Enrich Found Inventory Record

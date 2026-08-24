@@ -156,18 +156,56 @@ const updateUserProfile = async (req, res) => {
       }).select('-password');
     }
 
-    if (!updatedUser) {
-      updatedUser = {
-        id: userId || 'student_id',
-        fullName: req.user?.fullName || 'Student',
-        studentId: req.user?.studentId || 'N/A',
-        email: req.user?.email || 'N/A',
-        phone: phone || req.user?.phone || 'N/A',
-        department: department || req.user?.department || 'General',
-        year: year || req.user?.year || 'Student',
+    // Always update inMemoryUsers and inMemoryClaims for simultaneous sync
+    const { inMemoryUsers, inMemoryClaims, saveInMemoryStore } = require('../utils/inMemoryStore');
+    
+    let targetMemUser = inMemoryUsers.find(
+      (u) =>
+        String(u.id) === String(userId) ||
+        String(u._id) === String(userId) ||
+        (req.user?.email && u.email === req.user.email) ||
+        (req.user?.studentId && u.studentId === req.user.studentId)
+    );
+
+    if (!targetMemUser) {
+      targetMemUser = {
+        id: userId || 'USR-PAVI',
+        _id: userId || 'USR-PAVI',
+        fullName: req.user?.fullName || updatedUser?.fullName || 'Pavi',
+        studentId: req.user?.studentId || updatedUser?.studentId || 'PAVI1234',
+        email: req.user?.email || updatedUser?.email || '231501177@rajalakshmi.edu.in',
+        phone: phone || req.user?.phone || '9600929978',
+        department: department || req.user?.department || 'Artificial Intelligence & Machine Learning',
+        year: year || req.user?.year || '4th Year (Senior)',
         role: 'student',
       };
+      inMemoryUsers.push(targetMemUser);
+    } else {
+      if (phone !== undefined) targetMemUser.phone = phone.trim();
+      if (department !== undefined) targetMemUser.department = department.trim();
+      if (year !== undefined) targetMemUser.year = year.trim();
     }
+
+    if (!updatedUser) {
+      updatedUser = targetMemUser;
+    }
+
+    // Update in-memory claims matching this student so claims immediately reflect updated profile
+    inMemoryClaims.forEach((c) => {
+      const sId = typeof c.studentId === 'object' ? (c.studentId?._id || c.studentId?.id) : c.studentId;
+      if (String(sId) === String(userId) || String(c.studentEmail) === String(updatedUser.email) || String(c.studentRegId) === String(updatedUser.studentId)) {
+        if (typeof c.studentId === 'object') {
+          c.studentId.phone = updatedUser.phone;
+          c.studentId.department = updatedUser.department;
+          c.studentId.year = updatedUser.year;
+        }
+        c.studentPhone = updatedUser.phone;
+        c.studentDept = updatedUser.department;
+        c.studentYear = updatedUser.year;
+      }
+    });
+
+    saveInMemoryStore();
 
     return res.status(200).json({
       success: true,
