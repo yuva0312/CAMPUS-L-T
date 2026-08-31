@@ -61,10 +61,13 @@ const Login = () => {
       }
     } catch (err) {
       setLoading(false);
+      console.error('Login submit error:', err);
       if (err.response && err.response.data && err.response.data.message) {
         setError(err.response.data.message);
+      } else if (err.message && err.message !== 'Network Error') {
+        setError(err.message);
       } else {
-        setError('Network error or server unreachable. Please verify server status.');
+        setError('Network error or server unreachable. Please verify backend server status on port 5000.');
       }
     }
   };
