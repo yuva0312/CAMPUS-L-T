@@ -1,4 +1,5 @@
 @import "tailwindcss";
+
 /* Modern Design Tokens & Global Styles */
 :root {
   --bg-primary: #0b0f19;

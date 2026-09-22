@@ -1,6 +1,28 @@
 {
   "inMemoryLostItems": [
     {
+      "userId": "6ab2aafe7350f927c4d9d6ef",
+      "itemName": "REALME EARBUDS",
+      "category": "Earphones",
+      "location": "Rec cafe",
+      "specificLocation": "enterance of  rec cafe",
+      "lostDate": "2026-09-21T00:00:00.000Z",
+      "lostTime": "10:30",
+      "timeRange": "10:00 am-01:00pm",
+      "brand": "REALME",
+      "colour": "black",
+      "uniqueMark": "IT WILL BE LIKE..LINE BUD",
+      "specialFeature": "OVAL SHAPE FULL BLACK LINE BUDS",
+      "damage": "NEW",
+      "privateDescription": "OVAL SHAPE FULL BLACK LINE BUDS",
+      "imageUrl": "https://res.cloudinary.com/gkckycrm/image/upload/v1790095897/lost_and_found_uploads/image-1790095895265-878641364.jpg",
+      "status": "recovered",
+      "_id": "6ab2b2197350f927c4d9dc65",
+      "createdAt": "2026-09-22T16:51:37.888Z",
+      "updatedAt": "2026-09-22T16:51:37.888Z",
+      "__v": 0
+    },
+    {
       "userId": "6aa03c14f1b8449d34f8a986",
       "itemName": "earbuds realme",
       "category": "Earphones",
@@ -16,7 +38,7 @@
       "damage": "new",
       "privateDescription": "realme on middle",
       "imageUrl": "https://res.cloudinary.com/gkckycrm/image/upload/v1789836129/lost_and_found_uploads/image-1789836129370-875080326.jpg",
-      "status": "searching",
+      "status": "claimed",
       "_id": "6aaebb62b9fde67931cc3cfb",
       "createdAt": "2026-09-19T16:42:10.939Z",
       "updatedAt": "2026-09-19T16:42:10.939Z",
@@ -38,7 +60,7 @@
       "damage": "new",
       "privateDescription": "custom sticker on top",
       "imageUrl": "https://res.cloudinary.com/gkckycrm/image/upload/v1788886125/lost_and_found_uploads/image-1788886123336-78000994.jpg",
-      "status": "searching",
+      "status": "recovered",
       "_id": "6aa03c6df1b8449d34f8aa01",
       "createdAt": "2026-09-08T16:48:45.105Z",
       "updatedAt": "2026-09-08T16:48:45.105Z",
@@ -382,6 +404,31 @@
   ],
   "inMemoryFoundItems": [
     {
+      "reportedBy": "6ab2aafe7350f927c4d9d6ef",
+      "itemName": "REALME EARBUDS",
+      "category": "Earphones",
+      "location": "Rec cafe",
+      "specificLocation": "enterance of  rec cafe",
+      "foundDate": "2026-09-21T00:00:00.000Z",
+      "foundTime": "10:30",
+      "timeRange": "10:00 am-01:00pm",
+      "brand": "REALME",
+      "colour": "black",
+      "uniqueMark": "IT WILL BE LIKE..LINE BUD",
+      "specialFeature": "OVAL SHAPE FULL BLACK LINE BUDS",
+      "damage": "new",
+      "privateDescription": "OVAL SHAPE FULL BLACK LINE BUDS",
+      "imageUrl": "https://res.cloudinary.com/gkckycrm/image/upload/v1790096061/lost_and_found_uploads/image-1790096059554-121752637.jpg",
+      "status": "reported",
+      "_id": "6ab2b2bd7350f927c4d9dd61",
+      "createdAt": "2026-09-22T16:54:21.626Z",
+      "updatedAt": "2026-09-22T16:54:21.626Z",
+      "__v": 0,
+      "actualBrand": "REALME",
+      "actualColour": "black",
+      "id": "6ab2b2bd7350f927c4d9dd61"
+    },
+    {
       "reportedBy": "6aa03c14f1b8449d34f8a986",
       "itemName": "earbuds realme",
       "category": "Earphones",
@@ -397,7 +444,7 @@
       "damage": "new",
       "privateDescription": "realme on middle",
       "imageUrl": "https://res.cloudinary.com/gkckycrm/image/upload/v1789836195/lost_and_found_uploads/image-1789836194319-217349542.jpg",
-      "status": "reported",
+      "status": "claimed",
       "_id": "6aaebba4b9fde67931cc3d55",
       "createdAt": "2026-09-19T16:43:16.197Z",
       "updatedAt": "2026-09-19T16:43:16.197Z",
@@ -422,7 +469,7 @@
       "damage": "new",
       "privateDescription": "custom sticker on top",
       "imageUrl": "https://res.cloudinary.com/gkckycrm/image/upload/v1788886185/lost_and_found_uploads/image-1788886183496-903970128.jpg",
-      "status": "reported",
+      "status": "returned",
       "_id": "6aa03ca9f1b8449d34f8aa57",
       "createdAt": "2026-09-08T16:49:45.072Z",
       "updatedAt": "2026-09-08T16:49:45.072Z",
@@ -809,6 +856,42 @@
   "inMemoryClaims": [
     {
       "studentId": {
+        "_id": "6ab2aafe7350f927c4d9d6ef",
+        "id": "6ab2aafe7350f927c4d9d6ef",
+        "fullName": "Pavi",
+        "studentId": "PAVI1234",
+        "email": "231501177@rajalakshmi.edu.in",
+        "phone": "9600929978",
+        "department": "Artificial Intelligence & Machine Learning",
+        "year": "4th Year (Senior)"
+      },
+      "lostItemId": "6ab2b2197350f927c4d9dc65",
+      "foundItemId": "6aaebba4b9fde67931cc3d55",
+      "matchId": "6aaebba4b9fde67931cc3d55",
+      "verificationAnswers": {
+        "brand": "REALME EARBUDS ",
+        "colour": "black",
+        "uniqueMark": "OVAL SHAPE FULL BLACK LINE BUDS",
+        "lostLocation": "enterance of rec cafe",
+        "lostDateAndTime": "21 SEP 2026 AROUND 10:30 A.M",
+        "additionalFeature": "OVAL SHAPE FULL BLACK LINE BUDS"
+      },
+      "verificationScore": 58,
+      "status": "completed",
+      "_id": "6ab2b31c7350f927c4d9dda2",
+      "createdAt": "2026-09-22T16:55:56.205Z",
+      "updatedAt": "2026-09-22T16:55:56.205Z",
+      "__v": 0,
+      "studentName": "Pavi",
+      "studentEmail": "231501177@rajalakshmi.edu.in",
+      "studentPhone": "9600929978",
+      "studentRegId": "PAVI1234",
+      "studentDept": "Artificial Intelligence & Machine Learning",
+      "studentYear": "4th Year (Senior)",
+      "reviewedAt": "2026-09-22T17:14:05.910Z"
+    },
+    {
+      "studentId": {
         "_id": "6aa03c14f1b8449d34f8a986",
         "id": "6aa03c14f1b8449d34f8a986",
         "fullName": "Pavi",
@@ -830,7 +913,7 @@
         "additionalFeature": "realme on middle"
       },
       "verificationScore": 78,
-      "status": "pending",
+      "status": "approved",
       "_id": "6aaebbf6b9fde67931cc3d85",
       "createdAt": "2026-09-19T16:44:38.605Z",
       "updatedAt": "2026-09-19T16:44:38.605Z",
@@ -840,7 +923,8 @@
       "studentPhone": "9600929978",
       "studentRegId": "PAVI1234",
       "studentDept": "Artificial Intelligence & Machine Learning",
-      "studentYear": "4th Year (Senior)"
+      "studentYear": "4th Year (Senior)",
+      "reviewedAt": "2026-09-22T17:14:50.857Z"
     },
     {
       "studentId": {
@@ -865,7 +949,7 @@
         "additionalFeature": "custom sticker on top..."
       },
       "verificationScore": 75,
-      "status": "pending",
+      "status": "completed",
       "_id": "6aa03ce4f1b8449d34f8aa86",
       "createdAt": "2026-09-08T16:50:44.620Z",
       "updatedAt": "2026-09-08T16:50:44.620Z",
@@ -875,7 +959,8 @@
       "studentPhone": "9600929978",
       "studentRegId": "PAVI1234",
       "studentDept": "Artificial Intelligence & Machine Learning",
-      "studentYear": "4th Year (Senior)"
+      "studentYear": "4th Year (Senior)",
+      "reviewedAt": "2026-09-22T17:15:09.765Z"
     },
     {
       "studentId": {
@@ -1908,6 +1993,18 @@
       "year": "4th Year (Senior)",
       "role": "student",
       "createdAt": "2026-09-08T16:47:16.038Z"
+    },
+    {
+      "id": "6ab2aafe7350f927c4d9d6ef",
+      "_id": "6ab2aafe7350f927c4d9d6ef",
+      "fullName": "yuvaa",
+      "studentId": "YU0003",
+      "email": "yuva03@college.edu",
+      "phone": "9600929978",
+      "department": "Artificial Intelligence & Machine Learning",
+      "year": "4th Year (Senior)",
+      "role": "student",
+      "createdAt": "2026-09-22T16:21:18.070Z"
     }
   ]
 }

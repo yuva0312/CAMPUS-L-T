@@ -27,7 +27,7 @@ import AdminDashboard from './pages/admin/AdminDashboard';
 import AdminLostItems from './pages/admin/AdminLostItems';
 import AdminFoundItems from './pages/admin/AdminFoundItems';
 import AdminMatches from './pages/admin/AdminMatches';
-import AdminClaimReviewDashboard from './components/AdminClaimReviewDashboard';
+import AdminClaims from './pages/admin/AdminClaims'; // 👈 Correct import location
 
 export default function App() {
   return (
@@ -137,7 +137,7 @@ export default function App() {
           element={
             <ProtectedAdminRoute>
               <AdminLayout>
-                <AdminClaimReviewDashboard />
+                <AdminClaims /> {/* 👈 Updated route component */}
               </AdminLayout>
             </ProtectedAdminRoute>
           }
