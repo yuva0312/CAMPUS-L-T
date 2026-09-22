@@ -9,7 +9,45 @@ const MyClaims = () => {
   const [expandedClaimId, setExpandedClaimId] = useState(null);
 
   useEffect(() => {
-    fetchMyClaims();
+    let isMounted = true;
+
+    const loadClaims = async (isInitial = false) => {
+      try {
+        if (isInitial) setLoading(true);
+        setError('');
+        const response = await api.get('/claims/my');
+        if (response.data?.success && isMounted) {
+          setClaims(response.data.data);
+        }
+      } catch (err) {
+        console.error('Fetch my claims error:', err);
+        if (isInitial && isMounted) setError('Failed to load your claim requests.');
+      } finally {
+        if (isInitial && isMounted) setLoading(false);
+      }
+    };
+
+    loadClaims(true);
+
+    const handleUpdate = () => {
+      if (isMounted) loadClaims(false);
+    };
+
+    window.addEventListener('claimStatusChanged', handleUpdate);
+    window.addEventListener('dashboardStatsUpdated', handleUpdate);
+    window.addEventListener('focus', handleUpdate);
+
+    const intervalId = setInterval(() => {
+      handleUpdate();
+    }, 3000);
+
+    return () => {
+      isMounted = false;
+      window.removeEventListener('claimStatusChanged', handleUpdate);
+      window.removeEventListener('dashboardStatsUpdated', handleUpdate);
+      window.removeEventListener('focus', handleUpdate);
+      clearInterval(intervalId);
+    };
   }, []);
 
   const fetchMyClaims = async () => {

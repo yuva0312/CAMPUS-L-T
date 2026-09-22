@@ -9,14 +9,14 @@ const { inMemoryFoundItems, saveInMemoryStore } = require('../utils/inMemoryStor
  */
 const sanitizeFoundItemForPublic = (item, reqUser) => {
   const itemObj = item.toObject ? item.toObject() : { ...item };
-  
+
   const reporterIdStr = itemObj.reportedBy
     ? (itemObj.reportedBy._id || itemObj.reportedBy).toString()
     : (itemObj.reporter_id ? itemObj.reporter_id.toString() : '');
-    
+
   let userIdStr = '';
   let userRole = '';
-  
+
   if (reqUser) {
     if (typeof reqUser === 'object') {
       userIdStr = (reqUser._id || reqUser.id || '').toString();
@@ -66,8 +66,10 @@ exports.createFoundItem = async (req, res) => {
       specialFeature,
       damage,
       privateDescription,
-      imageUrl,
     } = req.body;
+
+    // Check if Cloudinary middleware attached a file path
+    const uploadedImageUrl = req.file ? req.file.path : (req.body.imageUrl || '');
 
     if (!itemName || !category || !location || !foundDate) {
       return res.status(400).json({
@@ -76,7 +78,7 @@ exports.createFoundItem = async (req, res) => {
       });
     }
 
-    const userId = req.user ? req.user._id : 'user_inmemory_' + Date.now();
+    const userId = req.user ? (req.user._id || req.user.id) : 'user_inmemory_' + Date.now();
 
     // Check DB connection
     if (mongoose.connection.readyState === 1) {
@@ -95,7 +97,7 @@ exports.createFoundItem = async (req, res) => {
         specialFeature: specialFeature || '',
         damage: damage || '',
         privateDescription: privateDescription || '',
-        imageUrl: imageUrl || '',
+        imageUrl: uploadedImageUrl,
         status: 'reported',
       });
 
@@ -128,7 +130,7 @@ exports.createFoundItem = async (req, res) => {
         specialFeature: specialFeature || '',
         damage: damage || '',
         privateDescription: privateDescription || '',
-        imageUrl: imageUrl || '',
+        imageUrl: uploadedImageUrl,
         status: 'reported',
         createdAt: new Date(),
         updatedAt: new Date(),
@@ -197,7 +199,7 @@ exports.getFoundItems = async (req, res) => {
 // @access  Private
 exports.getMyFoundItems = async (req, res) => {
   try {
-    const userId = req.user._id;
+    const userId = req.user._id || req.user.id;
 
     if (mongoose.connection.readyState === 1) {
       const items = await FoundItem.find({ reportedBy: userId }).sort({ createdAt: -1 });
@@ -226,6 +228,11 @@ exports.getMyFoundItems = async (req, res) => {
   }
 };
 
+const isValidObjectId = (id) => {
+  if (!id) return false;
+  return mongoose.Types.ObjectId.isValid(id) && String(new mongoose.Types.ObjectId(id)) === String(id);
+};
+
 // @desc    Get single Found Item by ID
 // @route   GET /api/found-items/:id
 // @access  Public / Private
@@ -234,35 +241,27 @@ exports.getFoundItemById = async (req, res) => {
     const { id } = req.params;
     const currentUser = req.user || null;
 
-    if (mongoose.connection.readyState === 1) {
-      const item = await FoundItem.findById(id).populate('reportedBy', 'fullName department year');
-      if (!item) {
-        return res.status(404).json({
-          success: false,
-          message: 'Found item report not found.',
-        });
-      }
+    let item = null;
+    if (mongoose.connection.readyState === 1 && isValidObjectId(id)) {
+      item = await FoundItem.findById(id).populate('reportedBy', 'fullName department year').catch(() => null);
+    }
 
-      const sanitized = sanitizeFoundItemForPublic(item, currentUser);
-      return res.status(200).json({
-        success: true,
-        data: sanitized,
-      });
-    } else {
-      const item = inMemoryFoundItems.find((i) => i._id === id);
-      if (!item) {
-        return res.status(404).json({
-          success: false,
-          message: 'Found item report not found.',
-        });
-      }
+    if (!item) {
+      item = inMemoryFoundItems.find((i) => String(i._id) === String(id) || String(i.id) === String(id));
+    }
 
-      const sanitized = sanitizeFoundItemForPublic(item, currentUser);
-      return res.status(200).json({
-        success: true,
-        data: sanitized,
+    if (!item) {
+      return res.status(404).json({
+        success: false,
+        message: 'Found item report not found.',
       });
     }
+
+    const sanitized = sanitizeFoundItemForPublic(item, currentUser);
+    return res.status(200).json({
+      success: true,
+      data: sanitized,
+    });
   } catch (error) {
     console.error('Get found item by ID error:', error);
     return res.status(500).json({
@@ -279,7 +278,12 @@ exports.getFoundItemById = async (req, res) => {
 exports.updateFoundItem = async (req, res) => {
   try {
     const { id } = req.params;
-    const userId = req.user._id;
+    const userId = req.user._id || req.user.id;
+
+    const updateData = { ...req.body };
+    if (req.file) {
+      updateData.imageUrl = req.file.path;
+    }
 
     if (mongoose.connection.readyState === 1) {
       const item = await FoundItem.findById(id);
@@ -288,13 +292,13 @@ exports.updateFoundItem = async (req, res) => {
       }
 
       if (item.reportedBy.toString() !== userId.toString()) {
-        return res.status(430).json({ success: false, message: 'Not authorized to edit this report.' });
+        return res.status(403).json({ success: false, message: 'Not authorized to edit this report.' });
       }
 
-      const updated = await FoundItem.findByIdAndUpdate(id, req.body, { new: true, runValidators: true });
+      const updated = await FoundItem.findByIdAndUpdate(id, updateData, { new: true, runValidators: true });
       return res.status(200).json({ success: true, message: 'Found item report updated.', data: updated });
     } else {
-      const index = inMemoryFoundItems.findIndex((i) => i._id === id);
+      const index = inMemoryFoundItems.findIndex((i) => String(i._id) === String(id));
       if (index === -1) {
         return res.status(404).json({ success: false, message: 'Found item report not found.' });
       }
@@ -303,7 +307,7 @@ exports.updateFoundItem = async (req, res) => {
         return res.status(403).json({ success: false, message: 'Not authorized to edit this report.' });
       }
 
-      inMemoryFoundItems[index] = { ...inMemoryFoundItems[index], ...req.body, updatedAt: new Date() };
+      inMemoryFoundItems[index] = { ...inMemoryFoundItems[index], ...updateData, updatedAt: new Date() };
       return res.status(200).json({ success: true, message: 'Found item report updated.', data: inMemoryFoundItems[index] });
     }
   } catch (error) {
@@ -318,7 +322,7 @@ exports.updateFoundItem = async (req, res) => {
 exports.deleteFoundItem = async (req, res) => {
   try {
     const { id } = req.params;
-    const userId = req.user._id;
+    const userId = req.user._id || req.user.id;
 
     if (mongoose.connection.readyState === 1) {
       const item = await FoundItem.findById(id);
@@ -333,7 +337,7 @@ exports.deleteFoundItem = async (req, res) => {
       await item.deleteOne();
       return res.status(200).json({ success: true, message: 'Found item report deleted successfully.' });
     } else {
-      const index = inMemoryFoundItems.findIndex((i) => i._id === id);
+      const index = inMemoryFoundItems.findIndex((i) => String(i._id) === String(id));
       if (index === -1) {
         return res.status(404).json({ success: false, message: 'Found item report not found.' });
       }

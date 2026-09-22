@@ -36,21 +36,24 @@ const Profile = () => {
   const [passwordMsg, setPasswordMsg] = useState({ type: '', text: '' });
 
   useEffect(() => {
-    const fetchProfile = async () => {
+    let isMounted = true;
+
+    const fetchProfile = async (isInitial = false) => {
       try {
-        setLoading(true);
+        if (isInitial) setLoading(true);
         const res = await api.get('/users/profile');
-        if (res.data?.success) {
+        if (res.data?.success && isMounted) {
           const u = res.data.data.user;
-          setProfileData({
-            fullName: u.fullName || authUser?.fullName || '',
-            studentId: u.studentId || authUser?.studentId || '',
-            email: u.email || authUser?.email || '',
-            phone: u.phone || authUser?.phone || '',
-            department: u.department || authUser?.department || '',
-            year: u.year || authUser?.year || '',
+          setProfileData((prev) => ({
+            ...prev,
+            fullName: u.fullName || authUser?.fullName || prev.fullName || '',
+            studentId: u.studentId || authUser?.studentId || prev.studentId || '',
+            email: u.email || authUser?.email || prev.email || '',
+            phone: u.phone || authUser?.phone || prev.phone || '',
+            department: u.department || authUser?.department || prev.department || '',
+            year: u.year || authUser?.year || prev.year || '',
             role: u.role || 'student',
-          });
+          }));
           setActivitySummary(res.data.data.activitySummary || {
             totalLostReports: 0,
             totalFoundReports: 0,
@@ -61,28 +64,41 @@ const Profile = () => {
         }
       } catch (err) {
         console.error('Fetch profile error:', err);
-        // Fallback with auth user
-        setProfileData({
-          fullName: authUser?.fullName || 'Student Name',
-          studentId: authUser?.studentId || 'CS2024-089',
-          email: authUser?.email || 'student@campus.edu',
-          phone: authUser?.phone || '+1 555-0192',
-          department: authUser?.department || 'Computer Science',
-          year: authUser?.year || '3rd Year',
-          role: authUser?.role || 'student',
-        });
-        setActivitySummary({
-          totalLostReports: 0,
-          totalFoundReports: 0,
-          claimsSubmitted: 0,
-          itemsRecovered: 0,
-        });
+        if (isInitial && isMounted) {
+          setProfileData({
+            fullName: authUser?.fullName || 'Student Name',
+            studentId: authUser?.studentId || 'CS2024-089',
+            email: authUser?.email || 'student@campus.edu',
+            phone: authUser?.phone || '+1 555-0192',
+            department: authUser?.department || 'Computer Science',
+            year: authUser?.year || '3rd Year',
+            role: authUser?.role || 'student',
+          });
+        }
       } finally {
-        setLoading(false);
+        if (isInitial && isMounted) setLoading(false);
       }
     };
 
-    fetchProfile();
+    fetchProfile(true);
+
+    const handleUpdateEvent = () => fetchProfile(false);
+
+    window.addEventListener('claimStatusChanged', handleUpdateEvent);
+    window.addEventListener('dashboardStatsUpdated', handleUpdateEvent);
+    window.addEventListener('focus', handleUpdateEvent);
+
+    const intervalId = setInterval(() => {
+      fetchProfile(false);
+    }, 3000);
+
+    return () => {
+      isMounted = false;
+      window.removeEventListener('claimStatusChanged', handleUpdateEvent);
+      window.removeEventListener('dashboardStatsUpdated', handleUpdateEvent);
+      window.removeEventListener('focus', handleUpdateEvent);
+      clearInterval(intervalId);
+    };
   }, [authUser]);
 
   const handleProfileSubmit = async (e) => {

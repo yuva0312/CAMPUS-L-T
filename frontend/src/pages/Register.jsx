@@ -1,9 +1,11 @@
 import React, { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import api from '../services/api';
+import { useAuth } from '../context/AuthContext';
 
-const Register = () => {
+export default function Register() {
   const navigate = useNavigate();
+  const { login } = useAuth();
 
   const [formData, setFormData] = useState({
     fullName: '',
@@ -49,35 +51,39 @@ const Register = () => {
       ...prev,
       [name]: value,
     }));
-    // Clear error on change
     if (error) setError('');
   };
 
   const validateForm = () => {
     const { fullName, studentId, email, phone, department, year, password, confirmPassword } = formData;
 
-    if (!fullName.trim() || !studentId.trim() || !email.trim() || !phone.trim() || !department || !year || !password || !confirmPassword) {
-      return 'All fields are required. Please complete the form.';
+    if (
+      !fullName.trim() ||
+      !studentId.trim() ||
+      !email.trim() ||
+      !phone.trim() ||
+      !department ||
+      !year ||
+      !password ||
+      !confirmPassword
+    ) {
+      return 'All required fields must be completed.';
     }
 
-    // Email regex validation
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(email.trim())) {
       return 'Please enter a valid college email address.';
     }
 
-    // Phone validation (digits, minimum 7 characters)
     const phoneRegex = /^[0-9+\-\s()]{7,15}$/;
     if (!phoneRegex.test(phone.trim())) {
       return 'Please enter a valid phone number (at least 7 digits).';
     }
 
-    // Password length check
     if (password.length < 6) {
       return 'Password must be at least 6 characters long.';
     }
 
-    // Confirm password match check
     if (password !== confirmPassword) {
       return 'Password and Confirm Password do not match.';
     }
@@ -99,80 +105,93 @@ const Register = () => {
     setLoading(true);
 
     try {
-      const response = await api.post('/auth/register', {
-        fullName: formData.fullName,
-        studentId: formData.studentId,
-        email: formData.email,
-        phone: formData.phone,
+      const payload = {
+        fullName: formData.fullName.trim(),
+        name: formData.fullName.trim(), // Dual payload naming support
+        studentId: formData.studentId.trim(),
+        email: formData.email.trim().toLowerCase(),
+        phone: formData.phone.trim(),
         department: formData.department,
         year: formData.year,
         password: formData.password,
-      });
+      };
 
-      if (response.data && response.data.success) {
-        setSuccess('Registration successful! Redirecting to home...');
-        setLoading(false);
-        // Redirect to Home with registered state after 1.5 seconds
+      const response = await api.post('/auth/register', payload);
+
+      if (response.data && (response.data.success || response.data.token)) {
+        setSuccess('Registration successful! Redirecting...');
+
+        // Save active session if backend responds with user and token credentials
+        if (response.data.token && response.data.user) {
+          login(response.data.user, response.data.token);
+        }
+
         setTimeout(() => {
-          navigate('/', { state: { registered: true } });
-        }, 1500);
+          navigate('/dashboard', { state: { registered: true } });
+        }, 1200);
       } else {
         setError(response.data?.message || 'Registration failed. Please try again.');
         setLoading(false);
       }
     } catch (err) {
       setLoading(false);
+      console.error('Registration submit error:', err);
       if (err.response && err.response.data && err.response.data.message) {
         setError(err.response.data.message);
+      } else if (err.message && err.message !== 'Network Error') {
+        setError(err.message);
       } else {
-        setError('Network error or server unreachable. Please check backend status.');
+        setError('Network error or server unreachable. Please verify backend status on port 5000.');
       }
     }
   };
 
   return (
-    <div className="auth-container">
+    <div className="auth-container" style={{ maxWidth: '580px', margin: '2.5rem auto', padding: '2rem', backgroundColor: '#ffffff', borderRadius: '12px', boxShadow: '0 4px 12px rgba(0,0,0,0.08)' }}>
       <div className="auth-card">
-        <div className="auth-header">
-          <h2 className="auth-title">Student Registration</h2>
-          <p className="auth-subtitle">Create your campus account to report lost belongings or return found items</p>
+        <div className="auth-header" style={{ marginBottom: '1.5rem' }}>
+          <h2 className="auth-title" style={{ fontSize: '1.5rem', fontWeight: '700', margin: '0 0 0.5rem 0', color: '#0f172a' }}>
+            Student Registration
+          </h2>
+          <p className="auth-subtitle" style={{ color: '#64748b', fontSize: '0.9rem', margin: 0 }}>
+            Create your campus account to report lost belongings or return found items.
+          </p>
         </div>
 
         {error && (
-          <div className="alert-box alert-error">
-            <span>⚠️</span> {error}
+          <div className="alert-box alert-error" style={{ padding: '0.75rem', marginBottom: '1rem', backgroundColor: '#fef2f2', border: '1px solid #fecaca', borderRadius: '6px', color: '#991b1b', fontSize: '0.875rem' }}>
+            ⚠️ {error}
           </div>
         )}
 
         {success && (
-          <div className="alert-box alert-success">
-            <span>✅</span> {success}
+          <div className="alert-box alert-success" style={{ padding: '0.75rem', marginBottom: '1rem', backgroundColor: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: '6px', color: '#166534', fontSize: '0.875rem' }}>
+            ✅ {success}
           </div>
         )}
 
-        <form onSubmit={handleSubmit} noValidate>
-          <div className="form-grid">
-            {/* 1. Full Name */}
-            <div className="form-group full-width">
-              <label className="form-label" htmlFor="fullName">
-                Full Name *
-              </label>
-              <input
-                type="text"
-                id="fullName"
-                name="fullName"
-                className="form-input"
-                placeholder="e.g. Alex Johnson"
-                value={formData.fullName}
-                onChange={handleChange}
-                required
-              />
-            </div>
+        <form onSubmit={handleSubmit} noValidate style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+          <div className="form-group">
+            <label className="form-label" htmlFor="fullName" style={{ display: 'block', fontSize: '0.85rem', fontWeight: '600', marginBottom: '0.35rem', color: '#334155' }}>
+              Full Name *
+            </label>
+            <input
+              type="text"
+              id="fullName"
+              name="fullName"
+              className="form-input"
+              placeholder="e.g. Alex Johnson"
+              value={formData.fullName}
+              onChange={handleChange}
+              required
+              style={{ width: '100%', padding: '0.65rem', border: '1px solid #cbd5e1', borderRadius: '6px', fontSize: '0.9rem', boxSizing: 'border-box' }}
+            />
+          </div>
 
-            {/* 2. Student ID */}
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
             <div className="form-group">
-              <label className="form-label" htmlFor="studentId">
-                Student ID / Register Number *
+              <label className="form-label" htmlFor="studentId" style={{ display: 'block', fontSize: '0.85rem', fontWeight: '600', marginBottom: '0.35rem', color: '#334155' }}>
+                Student ID / Reg No. *
               </label>
               <input
                 type="text"
@@ -183,29 +202,12 @@ const Register = () => {
                 value={formData.studentId}
                 onChange={handleChange}
                 required
+                style={{ width: '100%', padding: '0.65rem', border: '1px solid #cbd5e1', borderRadius: '6px', fontSize: '0.9rem', boxSizing: 'border-box' }}
               />
             </div>
 
-            {/* 3. College Email */}
             <div className="form-group">
-              <label className="form-label" htmlFor="email">
-                College Email *
-              </label>
-              <input
-                type="email"
-                id="email"
-                name="email"
-                className="form-input"
-                placeholder="e.g. student@college.edu"
-                value={formData.email}
-                onChange={handleChange}
-                required
-              />
-            </div>
-
-            {/* 4. Phone Number */}
-            <div className="form-group">
-              <label className="form-label" htmlFor="phone">
+              <label className="form-label" htmlFor="phone" style={{ display: 'block', fontSize: '0.85rem', fontWeight: '600', marginBottom: '0.35rem', color: '#334155' }}>
                 Phone Number *
               </label>
               <input
@@ -217,12 +219,31 @@ const Register = () => {
                 value={formData.phone}
                 onChange={handleChange}
                 required
+                style={{ width: '100%', padding: '0.65rem', border: '1px solid #cbd5e1', borderRadius: '6px', fontSize: '0.9rem', boxSizing: 'border-box' }}
               />
             </div>
+          </div>
 
-            {/* 5. Department */}
-            <div className="form-group full-width">
-              <label className="form-label" htmlFor="department">
+          <div className="form-group">
+            <label className="form-label" htmlFor="email" style={{ display: 'block', fontSize: '0.85rem', fontWeight: '600', marginBottom: '0.35rem', color: '#334155' }}>
+              College Email *
+            </label>
+            <input
+              type="email"
+              id="email"
+              name="email"
+              className="form-input"
+              placeholder="e.g. student@college.edu"
+              value={formData.email}
+              onChange={handleChange}
+              required
+              style={{ width: '100%', padding: '0.65rem', border: '1px solid #cbd5e1', borderRadius: '6px', fontSize: '0.9rem', boxSizing: 'border-box' }}
+            />
+          </div>
+
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+            <div className="form-group">
+              <label className="form-label" htmlFor="department" style={{ display: 'block', fontSize: '0.85rem', fontWeight: '600', marginBottom: '0.35rem', color: '#334155' }}>
                 Department *
               </label>
               <select
@@ -232,6 +253,7 @@ const Register = () => {
                 value={formData.department}
                 onChange={handleChange}
                 required
+                style={{ width: '100%', padding: '0.65rem', border: '1px solid #cbd5e1', borderRadius: '6px', fontSize: '0.9rem', boxSizing: 'border-box', backgroundColor: '#fff' }}
               >
                 <option value="">Select Department</option>
                 {departments.map((dept, index) => (
@@ -242,9 +264,8 @@ const Register = () => {
               </select>
             </div>
 
-            {/* 6. Year */}
-            <div className="form-group full-width">
-              <label className="form-label" htmlFor="year">
+            <div className="form-group">
+              <label className="form-label" htmlFor="year" style={{ display: 'block', fontSize: '0.85rem', fontWeight: '600', marginBottom: '0.35rem', color: '#334155' }}>
                 Academic Year *
               </label>
               <select
@@ -254,6 +275,7 @@ const Register = () => {
                 value={formData.year}
                 onChange={handleChange}
                 required
+                style={{ width: '100%', padding: '0.65rem', border: '1px solid #cbd5e1', borderRadius: '6px', fontSize: '0.9rem', boxSizing: 'border-box', backgroundColor: '#fff' }}
               >
                 <option value="">Select Academic Year</option>
                 {years.map((y, index) => (
@@ -263,10 +285,11 @@ const Register = () => {
                 ))}
               </select>
             </div>
+          </div>
 
-            {/* 7. Password */}
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
             <div className="form-group">
-              <label className="form-label" htmlFor="password">
+              <label className="form-label" htmlFor="password" style={{ display: 'block', fontSize: '0.85rem', fontWeight: '600', marginBottom: '0.35rem', color: '#334155' }}>
                 Password *
               </label>
               <input
@@ -278,12 +301,12 @@ const Register = () => {
                 value={formData.password}
                 onChange={handleChange}
                 required
+                style={{ width: '100%', padding: '0.65rem', border: '1px solid #cbd5e1', borderRadius: '6px', fontSize: '0.9rem', boxSizing: 'border-box' }}
               />
             </div>
 
-            {/* 8. Confirm Password */}
             <div className="form-group">
-              <label className="form-label" htmlFor="confirmPassword">
+              <label className="form-label" htmlFor="confirmPassword" style={{ display: 'block', fontSize: '0.85rem', fontWeight: '600', marginBottom: '0.35rem', color: '#334155' }}>
                 Confirm Password *
               </label>
               <input
@@ -295,24 +318,38 @@ const Register = () => {
                 value={formData.confirmPassword}
                 onChange={handleChange}
                 required
+                style={{ width: '100%', padding: '0.65rem', border: '1px solid #cbd5e1', borderRadius: '6px', fontSize: '0.9rem', boxSizing: 'border-box' }}
               />
             </div>
           </div>
 
-          <button type="submit" className="auth-submit-btn" disabled={loading}>
+          <button
+            type="submit"
+            className="auth-submit-btn"
+            disabled={loading}
+            style={{
+              marginTop: '0.5rem',
+              padding: '0.75rem',
+              backgroundColor: loading ? '#94a3b8' : '#0284c7',
+              color: '#ffffff',
+              border: 'none',
+              borderRadius: '6px',
+              fontWeight: '600',
+              cursor: loading ? 'not-allowed' : 'pointer',
+              fontSize: '0.95rem',
+            }}
+          >
             {loading ? 'Registering...' : 'Register'}
           </button>
         </form>
 
-        <div className="auth-footer-text">
+        <div className="auth-footer-text" style={{ marginTop: '1.5rem', textAlign: 'center', fontSize: '0.875rem', color: '#64748b' }}>
           Already have an account?{' '}
-          <Link to="/login" className="auth-link">
+          <Link to="/login" className="auth-link" style={{ color: '#0284c7', fontWeight: '600', textDecoration: 'none' }}>
             Login
           </Link>
         </div>
       </div>
     </div>
   );
-};
-
-export default Register;
+}

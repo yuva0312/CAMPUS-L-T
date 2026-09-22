@@ -95,4 +95,19 @@ const optionalAuth = async (req, res, next) => {
   next();
 };
 
-module.exports = { protect, optionalAuth };
+const adminOnly = (req, res, next) => {
+  if (
+    req.user &&
+    (req.user.isAdmin === true ||
+      req.user.role === 'admin' ||
+      req.user.role === 'STUDENT_CARE')
+  ) {
+    return next();
+  }
+  return res.status(403).json({
+    success: false,
+    message: 'Access denied: Admin privileges required.',
+  });
+};
+
+module.exports = { protect, optionalAuth, adminOnly };

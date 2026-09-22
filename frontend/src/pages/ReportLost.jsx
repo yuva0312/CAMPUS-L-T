@@ -67,9 +67,9 @@ const ReportLost = ({ onReturnToDashboard }) => {
     specialFeature: '',
     damage: '',
     privateDescription: '',
-    imageUrl: '',
   });
 
+  const [imageFile, setImageFile] = useState(null);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [submittedReport, setSubmittedReport] = useState(null);
@@ -81,6 +81,12 @@ const ReportLost = ({ onReturnToDashboard }) => {
       [name]: value,
     }));
     if (error) setError('');
+  };
+
+  const handleFileChange = (e) => {
+    if (e.target.files && e.target.files[0]) {
+      setImageFile(e.target.files[0]);
+    }
   };
 
   const handleSubmit = async (e) => {
@@ -131,24 +137,32 @@ const ReportLost = ({ onReturnToDashboard }) => {
     setLoading(true);
 
     try {
-      const payload = {
-        category: selectedCategory,
-        itemName: formData.itemName.trim(),
-        location: selectedLocation,
-        specificLocation: formData.specificLocation.trim(),
-        lostDate: formData.lostDate,
-        lostTime: formData.lostTime,
-        timeRange: formData.timeRange.trim(),
-        brand: formData.brand.trim(),
-        colour: formData.colour.trim(),
-        uniqueMark: formData.uniqueMark.trim(),
-        specialFeature: formData.specialFeature.trim(),
-        damage: formData.damage.trim(),
-        privateDescription: formData.privateDescription.trim(),
-        imageUrl: formData.imageUrl,
-      };
+      // Build multipart FormData payload for Cloudinary / Multer upload
+      const data = new FormData();
+      data.append('category', selectedCategory);
+      data.append('itemName', formData.itemName.trim());
+      data.append('location', selectedLocation);
+      data.append('specificLocation', formData.specificLocation.trim());
+      data.append('lostDate', formData.lostDate);
+      data.append('lostTime', formData.lostTime);
+      data.append('timeRange', formData.timeRange.trim());
+      data.append('brand', formData.brand.trim());
+      data.append('colour', formData.colour.trim());
+      data.append('uniqueMark', formData.uniqueMark.trim());
+      data.append('specialFeature', formData.specialFeature.trim());
+      data.append('damage', formData.damage.trim());
+      data.append('privateDescription', formData.privateDescription.trim());
 
-      const response = await api.post('/lost-items', payload);
+      if (imageFile) {
+        data.append('image', imageFile); // Multer middleware expects 'image'
+      }
+
+      // Send post request with multipart/form-data header
+      const response = await api.post('/lost-items', data, {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+        },
+      });
 
       if (response.data.success) {
         setSubmittedReport(response.data.data);
@@ -159,7 +173,7 @@ const ReportLost = ({ onReturnToDashboard }) => {
       console.error('Submit report error:', err);
       setError(
         err.response?.data?.message ||
-          'Server error while submitting report. Please try again.'
+        'Server error while submitting report. Please try again.'
       );
     } finally {
       setLoading(false);
@@ -185,8 +199,8 @@ const ReportLost = ({ onReturnToDashboard }) => {
       specialFeature: '',
       damage: '',
       privateDescription: '',
-      imageUrl: '',
     });
+    setImageFile(null);
     setError('');
   };
 
@@ -207,7 +221,7 @@ const ReportLost = ({ onReturnToDashboard }) => {
             Your lost item report has been created and registered in the system.
           </p>
 
-          <div 
+          <div
             style={{
               background: 'rgba(168, 85, 247, 0.1)',
               border: '1px solid rgba(168, 85, 247, 0.3)',
@@ -450,13 +464,13 @@ const ReportLost = ({ onReturnToDashboard }) => {
             </div>
           </div>
 
-          {/* SECTION 4 — PRIVATE IDENTIFICATION INFORMATION */}
+          {/* SECTION 4 — PRIVATE IDENTIFICATION INFORMATION & IMAGE UPLOAD */}
           <div className="form-section" style={{ marginBottom: '2.5rem' }}>
             <h3 className="section-title" style={{ fontSize: '1.25rem', color: '#c084fc', marginBottom: '1.25rem', borderBottom: '1px solid rgba(255,255,255,0.08)', paddingBottom: '0.5rem' }}>
               SECTION 4 — PRIVATE IDENTIFICATION INFORMATION
             </h3>
 
-            <div 
+            <div
               style={{
                 background: 'rgba(99, 102, 241, 0.1)',
                 border: '1px solid rgba(99, 102, 241, 0.3)',
@@ -543,7 +557,7 @@ const ReportLost = ({ onReturnToDashboard }) => {
               />
             </div>
 
-            <div className="form-group">
+            <div className="form-group" style={{ marginBottom: '1.25rem' }}>
               <label className="form-label" htmlFor="privateDescription">Additional Description</label>
               <textarea
                 id="privateDescription"
@@ -555,6 +569,22 @@ const ReportLost = ({ onReturnToDashboard }) => {
                 onChange={handleChange}
                 style={{ resize: 'vertical' }}
               ></textarea>
+            </div>
+
+            {/* IMAGE UPLOAD FIELD */}
+            <div className="form-group">
+              <label className="form-label" htmlFor="image">
+                Item Photo / Reference Image (Optional)
+              </label>
+              <input
+                type="file"
+                id="image"
+                name="image"
+                accept="image/*"
+                className="form-input"
+                onChange={handleFileChange}
+                style={{ padding: '0.6rem' }}
+              />
             </div>
           </div>
 

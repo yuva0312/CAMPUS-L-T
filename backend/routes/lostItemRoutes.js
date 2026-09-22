@@ -1,5 +1,6 @@
 const express = require('express');
 const router = express.Router();
+const upload = require('../utils/upload'); // Cloudinary upload middleware
 const {
   createLostItem,
   getMyLostItems,
@@ -9,23 +10,21 @@ const {
 } = require('../controllers/lostItemController');
 const { protect } = require('../middleware/authMiddleware');
 
-// All routes require authentication
+// Protect all lost item routes with authentication
 router.use(protect);
 
-// POST /api/lost-items
+// POST /api/lost-items (with image upload)
 // GET /api/lost-items/my
 router.route('/')
-  .post(createLostItem);
+  .post(upload.single('image'), createLostItem);
 
 router.route('/my')
   .get(getMyLostItems);
 
-// GET /api/lost-items/:id
-// PUT /api/lost-items/:id
-// DELETE /api/lost-items/:id
+// GET, PUT (with image update option), and DELETE /api/lost-items/:id
 router.route('/:id')
   .get(getLostItemById)
-  .put(updateLostItem)
+  .put(upload.single('image'), updateLostItem)
   .delete(deleteLostItem);
 
 module.exports = router;

@@ -1,15 +1,23 @@
-import React, { useContext } from 'react';
-import { NavLink, useNavigate } from 'react-router-dom';
-import { AuthContext } from '../context/AuthContext';
+import React from 'react';
+import { NavLink, useNavigate, Link } from 'react-router-dom';
+import { useAuth } from '../context/AuthContext';
 
-const AdminLayout = ({ children }) => {
-  const { user, logout } = useContext(AuthContext);
+export default function AdminLayout({ children }) {
+  const { user, logout } = useAuth();
   const navigate = useNavigate();
 
   const handleLogout = () => {
     logout();
     navigate('/admin/login');
   };
+
+  const navItems = [
+    { path: '/admin/dashboard', label: 'Dashboard', icon: '📊' },
+    { path: '/admin/claims', label: 'Claims Review', icon: '📋' },
+    { path: '/admin/lost-items', label: 'Lost Reports', icon: '🔍' },
+    { path: '/admin/found-items', label: 'Found Inventory', icon: '📦' },
+    { path: '/admin/matches', label: 'AI Match Intelligence', icon: '⚡' },
+  ];
 
   return (
     <div style={{ minHeight: '100vh', backgroundColor: '#090d16', color: '#f8fafc', fontFamily: 'Inter, system-ui, sans-serif' }}>
@@ -42,7 +50,7 @@ const AdminLayout = ({ children }) => {
           <div style={{ display: 'flex', alignItems: 'center', gap: '1.25rem' }}>
             <div style={{ textAlign: 'right' }}>
               <div style={{ fontSize: '0.88rem', fontWeight: '700', color: '#ffffff' }}>
-                {user?.fullName || 'Admin Authority'}
+                {user?.fullName || user?.name || 'Admin Authority'}
               </div>
               <div style={{ fontSize: '0.75rem', color: '#94a3b8' }}>{user?.email || 'admin@campus.edu'}</div>
             </div>
@@ -74,101 +82,34 @@ const AdminLayout = ({ children }) => {
             Main SC Menu
           </div>
           <nav style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
-            <NavLink
-              to="/admin/dashboard"
-              style={({ isActive }) => ({
-                display: 'flex',
-                alignItems: 'center',
-                gap: '0.75rem',
-                padding: '0.75rem 1rem',
-                borderRadius: '10px',
-                textDecoration: 'none',
-                fontWeight: '600',
-                fontSize: '0.9rem',
-                color: isActive ? '#ffffff' : '#94a3b8',
-                background: isActive ? 'linear-gradient(135deg, rgba(236, 72, 153, 0.2) 0%, rgba(139, 92, 246, 0.2) 100%)' : 'transparent',
-                borderLeft: isActive ? '3px solid #ec4899' : '3px solid transparent',
-              })}
-            >
-              📊 Dashboard
-            </NavLink>
-
-            <NavLink
-              to="/admin/claims"
-              style={({ isActive }) => ({
-                display: 'flex',
-                alignItems: 'center',
-                gap: '0.75rem',
-                padding: '0.75rem 1rem',
-                borderRadius: '10px',
-                textDecoration: 'none',
-                fontWeight: '600',
-                fontSize: '0.9rem',
-                color: isActive ? '#ffffff' : '#94a3b8',
-                background: isActive ? 'linear-gradient(135deg, rgba(236, 72, 153, 0.2) 0%, rgba(139, 92, 246, 0.2) 100%)' : 'transparent',
-                borderLeft: isActive ? '3px solid #ec4899' : '3px solid transparent',
-              })}
-            >
-              📋 Claims Review
-            </NavLink>
-
-            <NavLink
-              to="/admin/lost-items"
-              style={({ isActive }) => ({
-                display: 'flex',
-                alignItems: 'center',
-                gap: '0.75rem',
-                padding: '0.75rem 1rem',
-                borderRadius: '10px',
-                textDecoration: 'none',
-                fontWeight: '600',
-                fontSize: '0.9rem',
-                color: isActive ? '#ffffff' : '#94a3b8',
-                background: isActive ? 'linear-gradient(135deg, rgba(236, 72, 153, 0.2) 0%, rgba(139, 92, 246, 0.2) 100%)' : 'transparent',
-                borderLeft: isActive ? '3px solid #ec4899' : '3px solid transparent',
-              })}
-            >
-              🔍 Lost Reports
-            </NavLink>
-
-            <NavLink
-              to="/admin/found-items"
-              style={({ isActive }) => ({
-                display: 'flex',
-                alignItems: 'center',
-                gap: '0.75rem',
-                padding: '0.75rem 1rem',
-                borderRadius: '10px',
-                textDecoration: 'none',
-                fontWeight: '600',
-                fontSize: '0.9rem',
-                color: isActive ? '#ffffff' : '#94a3b8',
-                background: isActive ? 'linear-gradient(135deg, rgba(236, 72, 153, 0.2) 0%, rgba(139, 92, 246, 0.2) 100%)' : 'transparent',
-                borderLeft: isActive ? '3px solid #ec4899' : '3px solid transparent',
-              })}
-            >
-              📦 Found Inventory
-            </NavLink>
-
-            <NavLink
-              to="/admin/matches"
-              style={({ isActive }) => ({
-                display: 'flex',
-                alignItems: 'center',
-                gap: '0.75rem',
-                padding: '0.75rem 1rem',
-                borderRadius: '10px',
-                textDecoration: 'none',
-                fontWeight: '600',
-                fontSize: '0.9rem',
-                color: isActive ? '#ffffff' : '#94a3b8',
-                background: isActive ? 'linear-gradient(135deg, rgba(236, 72, 153, 0.2) 0%, rgba(139, 92, 246, 0.2) 100%)' : 'transparent',
-                borderLeft: isActive ? '3px solid #ec4899' : '3px solid transparent',
-              })}
-            >
-              ⚡ AI Match Intelligence
-            </NavLink>
+            {navItems.map((item) => (
+              <NavLink
+                key={item.path}
+                to={item.path}
+                style={({ isActive }) => ({
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.75rem',
+                  padding: '0.75rem 1rem',
+                  borderRadius: '10px',
+                  textDecoration: 'none',
+                  fontWeight: '600',
+                  fontSize: '0.9rem',
+                  color: isActive ? '#ffffff' : '#94a3b8',
+                  background: isActive ? 'linear-gradient(135deg, rgba(236, 72, 153, 0.2) 0%, rgba(139, 92, 246, 0.2) 100%)' : 'transparent',
+                  borderLeft: isActive ? '3px solid #ec4899' : '3px solid transparent',
+                })}
+              >
+                {item.icon} {item.label}
+              </NavLink>
+            ))}
           </nav>
+
+          <div style={{ borderTop: '1px solid rgba(255, 255, 255, 0.08)', marginTop: '1.25rem', paddingTop: '1rem' }}>
+            <Link to="/dashboard" style={{ color: '#94a3b8', textDecoration: 'none', fontSize: '0.85rem', display: 'block', textAlign: 'center' }}>
+              &larr; Switch to Student View
+            </Link>
+          </div>
         </aside>
 
         {/* MAIN BODY AREA */}
@@ -176,6 +117,4 @@ const AdminLayout = ({ children }) => {
       </div>
     </div>
   );
-};
-
-export default AdminLayout;
+}

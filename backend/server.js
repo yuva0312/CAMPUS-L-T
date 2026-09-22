@@ -15,6 +15,8 @@ const app = express();
 // Middleware
 const corsOptions = {
   origin: [
+    'http://localhost:5174', // ✅ Added Port 5174 (Your current Vite port)
+    'http://127.0.0.1:5174', // ✅ Added Port 5174
     'http://localhost:5173',
     'http://127.0.0.1:5173',
     'http://localhost:3000',
@@ -44,8 +46,9 @@ app.get('/api/health', (req, res) => {
     message: 'Lost & Found Backend is running'
   });
 });
+
 // API Routes
-app.use('/api/auth', authRoutes);
+app.use('/api/auth', authRoutes); // ✅ Route prefix is correct
 app.use('/api/lost-items', lostItemRoutes);
 app.use('/api/found-items', foundItemRoutes);
 app.use('/api/matches', matchRoutes);
@@ -63,7 +66,8 @@ const startServer = async () => {
     console.log('MongoDB URI not set or using placeholder. Skipping MongoDB connection on startup.');
   }
 
-  app.listen(PORT, () => {
+  // ✅ Listening on '0.0.0.0' prevents localhost / IPv6 connection drop errors
+  app.listen(PORT, '0.0.0.0', () => {
     console.log(`Server running on port ${PORT}`);
   });
 };

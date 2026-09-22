@@ -26,8 +26,10 @@ const createLostItem = async (req, res) => {
       specialFeature,
       damage,
       privateDescription,
-      imageUrl,
     } = req.body;
+
+    // Check if an image was uploaded via Multer/Cloudinary
+    const uploadedImageUrl = req.file ? req.file.path : (req.body.imageUrl || '');
 
     // Validation: Required fields
     if (!itemName || !itemName.trim()) {
@@ -58,7 +60,7 @@ const createLostItem = async (req, res) => {
       });
     }
 
-    const userId = req.user.id;
+    const userId = req.user.id || req.user._id;
 
     if (isDbConnected()) {
       const lostItem = await LostItem.create({
@@ -76,7 +78,7 @@ const createLostItem = async (req, res) => {
         specialFeature: specialFeature ? specialFeature.trim() : '',
         damage: damage ? damage.trim() : '',
         privateDescription: privateDescription ? privateDescription.trim() : '',
-        imageUrl: imageUrl ? imageUrl.trim() : '',
+        imageUrl: uploadedImageUrl,
         status: 'searching',
       });
 
@@ -109,7 +111,7 @@ const createLostItem = async (req, res) => {
         specialFeature: specialFeature ? specialFeature.trim() : '',
         damage: damage ? damage.trim() : '',
         privateDescription: privateDescription ? privateDescription.trim() : '',
-        imageUrl: imageUrl ? imageUrl.trim() : '',
+        imageUrl: uploadedImageUrl,
         status: 'searching',
         createdAt: new Date(),
         updatedAt: new Date(),
@@ -138,7 +140,7 @@ const createLostItem = async (req, res) => {
 // @access  Private
 const getMyLostItems = async (req, res) => {
   try {
-    const userId = req.user.id;
+    const userId = req.user.id || req.user._id;
 
     if (isDbConnected()) {
       const items = await LostItem.find({ userId }).sort({ createdAt: -1 });
@@ -167,19 +169,25 @@ const getMyLostItems = async (req, res) => {
   }
 };
 
+const isValidObjectId = (id) => {
+  if (!id) return false;
+  return mongoose.Types.ObjectId.isValid(id) && String(new mongoose.Types.ObjectId(id)) === String(id);
+};
+
 // @desc    Get single lost item report by ID
 // @route   GET /api/lost-items/:id
 // @access  Private
 const getLostItemById = async (req, res) => {
   try {
     const { id } = req.params;
-    const userId = req.user.id;
+    const userId = req.user.id || req.user._id;
 
-    let item;
-    if (isDbConnected()) {
-      item = await LostItem.findById(id);
-    } else {
-      item = inMemoryLostItems.find((i) => i._id.toString() === id.toString());
+    let item = null;
+    if (isDbConnected() && isValidObjectId(id)) {
+      item = await LostItem.findById(id).catch(() => null);
+    }
+    if (!item) {
+      item = inMemoryLostItems.find((i) => String(i._id) === String(id) || String(i.id) === String(id));
     }
 
     if (!item) {
@@ -193,14 +201,12 @@ const getLostItemById = async (req, res) => {
     const isOwner = itemUserId === userId.toString();
 
     if (isOwner) {
-      // Return complete information for owner
       return res.status(200).json({
         success: true,
         isOwner: true,
         data: item,
       });
     } else {
-      // Redact private identification details for non-owners
       const publicData = {
         _id: item._id,
         itemName: item.itemName,
@@ -210,6 +216,7 @@ const getLostItemById = async (req, res) => {
         lostDate: item.lostDate,
         lostTime: item.lostTime,
         timeRange: item.timeRange,
+        imageUrl: item.imageUrl,
         status: item.status,
         createdAt: item.createdAt,
       };
@@ -235,7 +242,7 @@ const getLostItemById = async (req, res) => {
 const updateLostItem = async (req, res) => {
   try {
     const { id } = req.params;
-    const userId = req.user.id;
+    const userId = req.user.id || req.user._id;
 
     if (isDbConnected()) {
       let item = await LostItem.findById(id);
@@ -268,7 +275,6 @@ const updateLostItem = async (req, res) => {
         'specialFeature',
         'damage',
         'privateDescription',
-        'imageUrl',
         'status',
       ];
 
@@ -278,7 +284,18 @@ const updateLostItem = async (req, res) => {
         }
       });
 
+      // Update imageUrl if a new file was uploaded via Cloudinary
+      if (req.file) {
+        item.imageUrl = req.file.path;
+      } else if (req.body.imageUrl !== undefined) {
+        item.imageUrl = req.body.imageUrl;
+      }
+
       await item.save();
+
+      const itemObj = item.toObject ? item.toObject() : { ...item };
+      const idx = inMemoryLostItems.findIndex((i) => String(i._id) === String(itemObj._id));
+      if (idx >= 0) inMemoryLostItems[idx] = itemObj;
 
       return res.status(200).json({
         success: true,
@@ -308,6 +325,10 @@ const updateLostItem = async (req, res) => {
         updatedAt: new Date(),
       };
 
+      if (req.file) {
+        updatedItem.imageUrl = req.file.path;
+      }
+
       inMemoryLostItems[index] = updatedItem;
 
       return res.status(200).json({
@@ -331,7 +352,7 @@ const updateLostItem = async (req, res) => {
 const deleteLostItem = async (req, res) => {
   try {
     const { id } = req.params;
-    const userId = req.user.id;
+    const userId = req.user.id || req.user._id;
 
     if (isDbConnected()) {
       const item = await LostItem.findById(id);
@@ -351,6 +372,9 @@ const deleteLostItem = async (req, res) => {
       }
 
       await LostItem.findByIdAndDelete(id);
+
+      const idx = inMemoryLostItems.findIndex((i) => String(i._id) === String(id));
+      if (idx >= 0) inMemoryLostItems.splice(idx, 1);
 
       return res.status(200).json({
         success: true,

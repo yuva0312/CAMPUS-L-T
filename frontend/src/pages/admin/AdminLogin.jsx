@@ -1,52 +1,115 @@
-import React, { useState, useContext } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { AuthContext } from '../../context/AuthContext';
-import api from '../../services/api';
+import React, { useState } from 'react';
+import { useNavigate, useLocation, Link } from 'react-router-dom';
 
-const AdminLogin = () => {
-  const [identifier, setIdentifier] = useState('admin@campus.edu');
-  const [password, setPassword] = useState('admin123');
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
-  const { login } = useContext(AuthContext);
+// Fixed import paths: stepping up two levels from src/pages/admin/
+import api from '../../services/api';
+import { useAuth } from '../../context/AuthContext';
+
+export default function AdminLogin() {
   const navigate = useNavigate();
+  const location = useLocation();
+  const { login } = useAuth();
+
+  // Target route from state or fallback to admin dashboard
+  const from = location.state?.from?.pathname || '/admin/dashboard';
+
+  const [formData, setFormData] = useState({
+    identifier: 'admin@campus.edu',
+    password: 'admin123',
+    adminSecretKey: '',
+  });
+
+  const [error, setError] = useState('');
+  const [success, setSuccess] = useState('');
+  const [loading, setLoading] = useState(false);
+
+  const handleChange = (e) => {
+    const { name, value } = e.target;
+    setFormData((prev) => ({
+      ...prev,
+      [name]: value,
+    }));
+    if (error) setError('');
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
+    setSuccess('');
 
-    if (!identifier || !password) {
+    const trimmedIdentifier = formData.identifier.trim();
+
+    if (!trimmedIdentifier || !formData.password) {
       setError('Please provide Admin Email/ID and password.');
       return;
     }
 
-    try {
-      setLoading(true);
-      const res = await api.post('/admin/login', { identifier, password });
+    setLoading(true);
 
-      if (res.data?.success) {
-        login(res.data.user, res.data.token);
-        navigate('/admin/dashboard');
+    const payload = {
+      identifier: trimmedIdentifier,
+      email: trimmedIdentifier.toLowerCase(),
+      password: formData.password,
+      adminSecretKey: formData.adminSecretKey.trim() || undefined,
+      isAdmin: true,
+    };
+
+    try {
+      let res;
+      // Primary route attempt
+      try {
+        res = await api.post('/admin/login', payload);
+      } catch (firstErr) {
+        // Fallback endpoint attempt if primary fails or isn't routed
+        res = await api.post('/auth/admin-login', payload);
+      }
+
+      if (res.data && (res.data.success || res.data.token)) {
+        setSuccess('Administrator verification successful! Redirecting...');
+
+        const adminUser = res.data.user
+          ? { ...res.data.user, role: res.data.user.role || 'admin' }
+          : { email: trimmedIdentifier, role: 'admin' };
+
+        login(adminUser, res.data.token);
+        setLoading(false);
+
+        setTimeout(() => {
+          navigate(from, { replace: true });
+        }, 800);
       } else {
-        setError(res.data?.message || 'Admin authentication failed.');
+        setError(res.data?.message || 'Admin authentication failed. Access denied.');
+        setLoading(false);
       }
     } catch (err) {
-      console.error('Admin login error:', err);
-      // Fallback dev mode login for instant testing
-      if ((identifier === 'admin@campus.edu' || identifier === 'studentcare@campus.edu') && password === 'admin123') {
+      console.error('Admin login submission error:', err);
+
+      // Dev-mode offline fallback for instant offline testing
+      if (
+        (trimmedIdentifier === 'admin@campus.edu' ||
+          trimmedIdentifier === 'studentcare@campus.edu') &&
+        formData.password === 'admin123'
+      ) {
+        setSuccess('Offline Dev Mode: Verified locally! Redirecting...');
         const dummyUser = {
           id: 'admin_user_id',
           fullName: 'Student Care Team Admin',
-          email: identifier,
+          email: trimmedIdentifier,
           role: 'admin',
         };
-        login(dummyUser, 'demo_admin_jwt_token');
-        navigate('/admin/dashboard');
+
+        setTimeout(() => {
+          login(dummyUser, 'demo_admin_jwt_token');
+          setLoading(false);
+          navigate(from, { replace: true });
+        }, 600);
       } else {
-        setError(err.response?.data?.message || 'Invalid admin credentials.');
+        setLoading(false);
+        setError(
+          err.response?.data?.message ||
+          'Invalid admin credentials or server unreachable.'
+        );
       }
-    } finally {
-      setLoading(false);
     }
   };
 
@@ -66,21 +129,22 @@ const AdminLogin = () => {
         className="glass-card"
         style={{
           width: '100%',
-          maxWidth: '440px',
+          maxWidth: '450px',
           padding: '2.5rem',
           borderRadius: '24px',
-          backgroundColor: 'rgba(15, 23, 42, 0.75)',
+          backgroundColor: 'rgba(15, 23, 42, 0.85)',
           border: '1px solid rgba(255, 255, 255, 0.12)',
           boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.7)',
         }}
       >
-        <div style={{ textAlign: 'center', marginBottom: '2rem' }}>
+        <div style={{ textAlign: 'center', marginBottom: '1.75rem' }}>
           <div
             style={{
               display: 'inline-flex',
               padding: '0.8rem',
               borderRadius: '16px',
-              background: 'linear-gradient(135deg, rgba(236, 72, 153, 0.2) 0%, rgba(139, 92, 246, 0.2) 100%)',
+              background:
+                'linear-gradient(135deg, rgba(236, 72, 153, 0.2) 0%, rgba(139, 92, 246, 0.2) 100%)',
               border: '1px solid rgba(236, 72, 153, 0.4)',
               fontSize: '2rem',
               marginBottom: '1rem',
@@ -88,11 +152,27 @@ const AdminLogin = () => {
           >
             🛡️
           </div>
-          <h2 style={{ fontSize: '1.8rem', fontWeight: '800', color: '#ffffff', margin: '0 0 0.5rem' }}>
-            Student Care Team
+          <h2
+            style={{
+              fontSize: '1.8rem',
+              fontWeight: '800',
+              color: '#ffffff',
+              margin: '0 0 0.5rem',
+            }}
+          >
+            Admin Portal Sign-In
           </h2>
-          <p style={{ color: '#ec4899', fontSize: '0.9rem', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-            Student Care Authentication
+          <p
+            style={{
+              color: '#ec4899',
+              fontSize: '0.85rem',
+              fontWeight: '600',
+              textTransform: 'uppercase',
+              letterSpacing: '0.05em',
+              margin: 0,
+            }}
+          >
+            Restricted Panel — Student Care Authority
           </p>
         </div>
 
@@ -104,7 +184,7 @@ const AdminLogin = () => {
               color: '#f87171',
               padding: '0.85rem 1rem',
               borderRadius: '12px',
-              marginBottom: '1.5rem',
+              marginBottom: '1.25rem',
               fontSize: '0.88rem',
             }}
           >
@@ -112,16 +192,46 @@ const AdminLogin = () => {
           </div>
         )}
 
-        <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+        {success && (
+          <div
+            style={{
+              backgroundColor: 'rgba(34, 197, 94, 0.15)',
+              border: '1px solid rgba(34, 197, 94, 0.3)',
+              color: '#4ade80',
+              padding: '0.85rem 1rem',
+              borderRadius: '12px',
+              marginBottom: '1.25rem',
+              fontSize: '0.88rem',
+            }}
+          >
+            ✅ {success}
+          </div>
+        )}
+
+        <form
+          onSubmit={handleSubmit}
+          noValidate
+          style={{ display: 'flex', flexDirection: 'column', gap: '1.1rem' }}
+        >
           <div>
-            <label style={{ display: 'block', color: '#cbd5e1', fontSize: '0.85rem', fontWeight: '600', marginBottom: '0.4rem' }}>
-              Student Care Email / ID
+            <label
+              htmlFor="identifier"
+              style={{
+                display: 'block',
+                color: '#cbd5e1',
+                fontSize: '0.85rem',
+                fontWeight: '600',
+                marginBottom: '0.4rem',
+              }}
+            >
+              Admin Email / ID *
             </label>
             <input
               type="text"
-              className="form-input"
-              value={identifier}
-              onChange={(e) => setIdentifier(e.target.value)}
+              id="identifier"
+              name="identifier"
+              value={formData.identifier}
+              onChange={handleChange}
               placeholder="admin@campus.edu"
               required
               style={{
@@ -138,16 +248,59 @@ const AdminLogin = () => {
           </div>
 
           <div>
-            <label style={{ display: 'block', color: '#cbd5e1', fontSize: '0.85rem', fontWeight: '600', marginBottom: '0.4rem' }}>
-              Student Care Password
+            <label
+              htmlFor="password"
+              style={{
+                display: 'block',
+                color: '#cbd5e1',
+                fontSize: '0.85rem',
+                fontWeight: '600',
+                marginBottom: '0.4rem',
+              }}
+            >
+              Password *
             </label>
             <input
               type="password"
-              className="form-input"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
+              id="password"
+              name="password"
+              value={formData.password}
+              onChange={handleChange}
               placeholder="••••••••"
               required
+              style={{
+                width: '100%',
+                padding: '0.8rem 1rem',
+                backgroundColor: 'rgba(15, 23, 42, 0.6)',
+                border: '1px solid rgba(255, 255, 255, 0.12)',
+                borderRadius: '10px',
+                color: '#ffffff',
+                fontSize: '0.95rem',
+                boxSizing: 'border-box',
+              }}
+            />
+          </div>
+
+          <div>
+            <label
+              htmlFor="adminSecretKey"
+              style={{
+                display: 'block',
+                color: '#cbd5e1',
+                fontSize: '0.85rem',
+                fontWeight: '600',
+                marginBottom: '0.4rem',
+              }}
+            >
+              Security Key <span style={{ fontWeight: '400', color: '#94a3b8' }}>(Optional)</span>
+            </label>
+            <input
+              type="password"
+              id="adminSecretKey"
+              name="adminSecretKey"
+              value={formData.adminSecretKey}
+              onChange={handleChange}
+              placeholder="Enter admin passcode"
               style={{
                 width: '100%',
                 padding: '0.8rem 1rem',
@@ -171,27 +324,53 @@ const AdminLogin = () => {
               border: 'none',
               borderRadius: '12px',
               color: '#ffffff',
-              fontSize: '1rem',
+              fontSize: '0.95rem',
               fontWeight: '700',
               cursor: loading ? 'not-allowed' : 'pointer',
               boxShadow: '0 10px 20px -5px rgba(236, 72, 153, 0.5)',
+              opacity: loading ? 0.7 : 1,
             }}
           >
-            {loading ? 'Authenticating Authority...' : 'Sign In as Student Care Admin'}
+            {loading ? 'Authenticating Authority...' : 'Sign In as Administrator'}
           </button>
         </form>
 
-        <div style={{ marginTop: '1.5rem', textAlign: 'center' }}>
+        <div
+          style={{
+            marginTop: '1.5rem',
+            textAlign: 'center',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '0.5rem',
+          }}
+        >
+          <Link
+            to="/login"
+            style={{
+              color: '#38bdf8',
+              fontSize: '0.875rem',
+              fontWeight: '600',
+              textDecoration: 'none',
+            }}
+          >
+            Are you a student? Standard Login →
+          </Link>
+
           <button
             onClick={() => navigate('/')}
-            style={{ background: 'transparent', border: 'none', color: '#94a3b8', fontSize: '0.85rem', cursor: 'pointer' }}
+            style={{
+              background: 'transparent',
+              border: 'none',
+              color: '#94a3b8',
+              fontSize: '0.85rem',
+              cursor: 'pointer',
+              marginTop: '0.25rem',
+            }}
           >
-            ← Return to Student Portal
+            ← Return to Home Portal
           </button>
         </div>
       </div>
     </div>
   );
-};
-
-export default AdminLogin;
+}

@@ -30,6 +30,7 @@ const ClaimItem = () => {
     additionalFeature: '',
   });
 
+  const [proofImage, setProofImage] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [submittedClaim, setSubmittedClaim] = useState(null);
@@ -66,6 +67,12 @@ const ClaimItem = () => {
     if (error) setError('');
   };
 
+  const handleFileChange = (e) => {
+    if (e.target.files && e.target.files[0]) {
+      setProofImage(e.target.files[0]);
+    }
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
 
@@ -78,11 +85,28 @@ const ClaimItem = () => {
     setError('');
 
     try {
-      const response = await api.post('/claims', {
-        matchId: matchId || `match_${Date.now()}`,
-        lostItemId: location.state?.lostItemId || null,
-        foundItemId: matchData.foundItemId,
-        verificationAnswers: formData,
+      // Build multipart FormData payload
+      const data = new FormData();
+      data.append('matchId', matchId || `match_${Date.now()}`);
+      
+      if (location.state?.lostItemId) {
+        data.append('lostItemId', location.state.lostItemId);
+      }
+      
+      data.append('foundItemId', matchData.foundItemId);
+      
+      // Serialize verification answers JSON object into FormData
+      data.append('verificationAnswers', JSON.stringify(formData));
+
+      if (proofImage) {
+        data.append('proofImage', proofImage); // Multer middleware expects 'proofImage'
+      }
+
+      // Send POST request with multipart/form-data header
+      const response = await api.post('/claims', data, {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+        },
       });
 
       if (response.data.success) {
@@ -318,7 +342,7 @@ const ClaimItem = () => {
             </div>
 
             {/* QUESTION 6 */}
-            <div className="form-group" style={{ marginBottom: '2rem' }}>
+            <div className="form-group" style={{ marginBottom: '1.25rem' }}>
               <label className="form-label" style={{ fontWeight: '600', color: '#e2e8f0' }}>
                 6. Describe one additional identifying feature.
               </label>
@@ -329,6 +353,21 @@ const ClaimItem = () => {
                 placeholder="e.g. Slight scratch on bottom right corner, leather band stitching detail"
                 className="form-textarea"
                 rows={3}
+              />
+            </div>
+
+            {/* PROOF IMAGE UPLOAD */}
+            <div className="form-group" style={{ marginBottom: '2rem' }}>
+              <label className="form-label" style={{ fontWeight: '600', color: '#e2e8f0' }}>
+                7. Upload Proof / Ownership Image (Optional)
+              </label>
+              <input
+                type="file"
+                name="proofImage"
+                accept="image/*"
+                onChange={handleFileChange}
+                className="form-input"
+                style={{ padding: '0.6rem' }}
               />
             </div>
 

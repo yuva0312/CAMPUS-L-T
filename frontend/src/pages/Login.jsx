@@ -1,11 +1,15 @@
-import React, { useState, useContext } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import React, { useState } from 'react';
+import { Link, useNavigate, useLocation } from 'react-router-dom';
 import api from '../services/api';
-import { AuthContext } from '../context/AuthContext';
+import { useAuth } from '../context/AuthContext';
 
-const Login = () => {
+export default function Login() {
   const navigate = useNavigate();
-  const { login } = useContext(AuthContext);
+  const location = useLocation();
+  const { login } = useAuth();
+
+  // Retrieve preserved destination or fallback to student dashboard
+  const from = location.state?.from?.pathname || '/dashboard';
 
   const [formData, setFormData] = useState({
     identifier: '',
@@ -45,16 +49,16 @@ const Login = () => {
 
       if (response.data && response.data.success) {
         setSuccess(response.data.message || 'Login successful!');
-        
-        // Update global auth state & localStorage
+
+        // Save user and session token to AuthContext
         login(response.data.user, response.data.token);
-        
+
         setLoading(false);
 
-        // Redirect to dashboard after a short delay
+        // Redirect directly to original protected destination or /dashboard
         setTimeout(() => {
-          navigate('/dashboard');
-        }, 1200);
+          navigate(from, { replace: true });
+        }, 1000);
       } else {
         setError(response.data?.message || 'Login failed. Please try again.');
         setLoading(false);
@@ -143,6 +147,4 @@ const Login = () => {
       </div>
     </div>
   );
-};
-
-export default Login;
+}

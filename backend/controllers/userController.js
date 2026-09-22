@@ -4,91 +4,60 @@ const FoundItem = require('../models/FoundItem');
 const Claim = require('../models/Claim');
 const bcrypt = require('bcryptjs');
 
-// Fallback in-memory store reference from authController if MongoDB is not connected
+// Helper function to extract normalized ID or check if object matches student user
+const matchesStudentUser = (targetObj, reqUser) => {
+  if (!targetObj || !reqUser) return false;
+
+  const reqUserId = reqUser.id ? String(reqUser.id) : (reqUser._id ? String(reqUser._id) : '');
+  const reqUserEmail = reqUser.email ? reqUser.email.toLowerCase().trim() : '';
+  const reqUserRegId = reqUser.studentId ? reqUser.studentId.trim() : '';
+
+  let targetIdStr = '';
+  let targetEmail = '';
+  let targetRegId = '';
+
+  if (typeof targetObj === 'object' && targetObj !== null) {
+    targetIdStr = String(targetObj._id || targetObj.id || '');
+    targetEmail = (targetObj.email || '').toLowerCase().trim();
+    targetRegId = (targetObj.studentId || '').trim();
+  } else if (typeof targetObj === 'string' || typeof targetObj === 'number') {
+    targetIdStr = String(targetObj);
+  }
+
+  if (reqUserId && targetIdStr && reqUserId === targetIdStr) return true;
+  if (reqUserEmail && targetEmail && reqUserEmail === targetEmail) return true;
+  if (reqUserRegId && targetRegId && reqUserRegId === targetRegId) return true;
+
+  return false;
+};
+
+// @desc    Get Student Profile Details, Activity Summary, and Returned History
+// @route   GET /api/users/profile
+// @access  Private
 const getUserProfile = async (req, res) => {
   try {
     const userId = req.user?.id || req.user?._id;
+    const userEmail = req.user?.email ? req.user.email.toLowerCase().trim() : '';
+    const userRegId = req.user?.studentId ? req.user.studentId.trim() : '';
 
     const mongoose = require('mongoose');
     const isDbConnected = mongoose.connection && mongoose.connection.readyState === 1;
 
+    const { inMemoryLostItems, inMemoryFoundItems, inMemoryClaims, inMemoryUsers } = require('../utils/inMemoryStore');
+
     let userDoc = null;
-    let activitySummary = {
-      totalLostReports: 0,
-      totalFoundReports: 0,
-      claimsSubmitted: 0,
-      itemsRecovered: 0,
-    };
 
-    let returnedHistory = [];
-
-    if (isDbConnected && userId) {
+    if (isDbConnected && userId && mongoose.Types.ObjectId.isValid(userId)) {
       userDoc = await User.findById(userId).select('-password');
-      if (userDoc) {
-        const [lostCount, foundCount, claimCount, recoveredLostCount, recoveredClaimsCount, recoveredClaims] = await Promise.all([
-          LostItem.countDocuments({ userId }),
-          FoundItem.countDocuments({ reportedBy: userId }),
-          Claim.countDocuments({ studentId: userId }),
-          LostItem.countDocuments({ userId, status: { $in: ['recovered', 'claimed'] } }),
-          Claim.countDocuments({ studentId: userId, status: { $in: ['completed', 'recovered'] } }),
-          Claim.find({ studentId: userId, status: { $in: ['completed', 'recovered'] } }).populate('foundItemId lostItemId'),
-        ]);
+    }
 
-        activitySummary = {
-          totalLostReports: lostCount,
-          totalFoundReports: foundCount,
-          claimsSubmitted: claimCount,
-          itemsRecovered: Math.max(recoveredLostCount, recoveredClaimsCount),
-        };
-
-        returnedHistory = recoveredClaims.map((c) => {
-          const found = c.foundItemId || {};
-          const lost = c.lostItemId || {};
-          return {
-            id: c._id,
-            itemName: found.itemName || lost.itemName || 'Recovered Belonging',
-            category: found.category || lost.category || 'General',
-            recoveredDate: c.reviewedAt || c.updatedAt || c.createdAt,
-            status: 'Item Returned',
-          };
-        });
-      }
-    } else {
-      const { inMemoryLostItems, inMemoryFoundItems, inMemoryClaims } = require('../utils/inMemoryStore');
-      const targetUserId = userId ? String(userId) : '';
-      const userLost = targetUserId ? inMemoryLostItems.filter((i) => String(i.userId || i.reportedBy) === targetUserId) : inMemoryLostItems;
-      const userFound = targetUserId ? inMemoryFoundItems.filter((i) => String(i.reportedBy) === targetUserId) : inMemoryFoundItems;
-      const userClaims = targetUserId ? inMemoryClaims.filter((c) => String(c.studentId) === targetUserId) : inMemoryClaims;
-      const userRecoveredClaims = userClaims.filter((c) => c && ['completed', 'recovered'].includes(c.status));
-      const userRecoveredLost = userLost.filter((i) => i && ['recovered', 'claimed'].includes(i.status));
-
-      activitySummary = {
-        totalLostReports: userLost.length,
-        totalFoundReports: userFound.length,
-        claimsSubmitted: userClaims.length,
-        itemsRecovered: Math.max(userRecoveredClaims.length, userRecoveredLost.length),
-      };
-
-      const mappedFromClaims = userRecoveredClaims.map((c) => ({
-        id: c._id,
-        itemName: c.verificationAnswers?.brand ? `${c.verificationAnswers?.brand} Item` : 'Recovered Belonging',
-        category: 'Personal Item',
-        recoveredDate: c.reviewedAt || new Date(),
-        status: 'Item Returned',
-      }));
-
-      const mappedFromLost = userRecoveredLost.map((l) => ({
-        id: l._id,
-        itemName: l.itemName || 'Recovered Belonging',
-        category: l.category || 'General',
-        recoveredDate: l.updatedAt || new Date(),
-        status: 'Item Returned',
-      }));
-
-      const map = new Map();
-      mappedFromClaims.forEach((item) => map.set(String(item.id), item));
-      mappedFromLost.forEach((item) => map.set(String(item.id), item));
-      returnedHistory = Array.from(map.values());
+    if (!userDoc && req.user) {
+      userDoc = inMemoryUsers.find(
+        (u) =>
+          matchesStudentUser(u, req.user) ||
+          (u.email && u.email.toLowerCase().trim() === userEmail) ||
+          (u.studentId && u.studentId.trim() === userRegId)
+      );
     }
 
     if (!userDoc) {
@@ -103,6 +72,157 @@ const getUserProfile = async (req, res) => {
         role: req.user?.role || 'student',
       };
     }
+
+    // --- 1. COLLECT LOST ITEMS FOR USER ---
+    let dbLost = [];
+    if (isDbConnected && userId) {
+      dbLost = await LostItem.find({
+        $or: [{ userId }, { userEmail: userEmail }],
+      }).catch(() => []);
+    }
+
+    const lostMap = new Map();
+    dbLost.forEach((item) => {
+      const iObj = item.toObject ? item.toObject() : { ...item };
+      lostMap.set(String(iObj._id), iObj);
+    });
+
+    inMemoryLostItems.forEach((l) => {
+      if (
+        matchesStudentUser(l.userId, req.user) ||
+        (l.userEmail && l.userEmail.toLowerCase().trim() === userEmail)
+      ) {
+        const lId = String(l._id);
+        if (!lostMap.has(lId)) {
+          lostMap.set(lId, l);
+        } else {
+          // Sync status
+          if (l.status) lostMap.get(lId).status = l.status;
+        }
+      }
+    });
+
+    const allUserLost = Array.from(lostMap.values());
+
+    // --- 2. COLLECT FOUND ITEMS FOR USER ---
+    let dbFound = [];
+    if (isDbConnected && userId) {
+      dbFound = await FoundItem.find({
+        $or: [{ reportedBy: userId }, { userEmail: userEmail }],
+      }).catch(() => []);
+    }
+
+    const foundMap = new Map();
+    dbFound.forEach((item) => {
+      const iObj = item.toObject ? item.toObject() : { ...item };
+      foundMap.set(String(iObj._id), iObj);
+    });
+
+    inMemoryFoundItems.forEach((f) => {
+      if (
+        matchesStudentUser(f.reportedBy, req.user) ||
+        (f.userEmail && f.userEmail.toLowerCase().trim() === userEmail)
+      ) {
+        const fId = String(f._id);
+        if (!foundMap.has(fId)) {
+          foundMap.set(fId, f);
+        } else {
+          if (f.status) foundMap.get(fId).status = f.status;
+        }
+      }
+    });
+
+    const allUserFound = Array.from(foundMap.values());
+
+    // --- 3. COLLECT CLAIMS FOR USER ---
+    let dbClaims = [];
+    if (isDbConnected && userId) {
+      dbClaims = await Claim.find({ studentId: userId })
+        .populate('foundItemId lostItemId')
+        .catch(() => []);
+    }
+
+    const claimsMap = new Map();
+    dbClaims.forEach((claim) => {
+      const cObj = claim.toObject ? claim.toObject() : { ...claim };
+      claimsMap.set(String(cObj._id), cObj);
+    });
+
+    inMemoryClaims.forEach((c) => {
+      if (
+        matchesStudentUser(c.studentId, req.user) ||
+        (c.studentEmail && c.studentEmail.toLowerCase().trim() === userEmail) ||
+        (c.studentRegId && c.studentRegId.trim() === userRegId)
+      ) {
+        const cId = String(c._id);
+        if (claimsMap.has(cId)) {
+          const existing = claimsMap.get(cId);
+          if (c.status) existing.status = c.status;
+          if (c.reviewedAt) existing.reviewedAt = c.reviewedAt;
+        } else {
+          claimsMap.set(cId, c);
+        }
+      }
+    });
+
+    const allUserClaims = Array.from(claimsMap.values());
+
+    // --- 4. CALCULATE RECOVERED ITEMS & RETURNED HISTORY ---
+    const userRecoveredClaims = allUserClaims.filter((c) =>
+      c && ['completed', 'recovered', 'returned', 'approved'].includes((c.status || '').toLowerCase())
+    );
+
+    const userRecoveredLost = allUserLost.filter((l) =>
+      l && ['recovered', 'claimed', 'returned'].includes((l.status || '').toLowerCase())
+    );
+
+    const itemsRecoveredCount = Math.max(userRecoveredClaims.length, userRecoveredLost.length);
+
+    const activitySummary = {
+      totalLostReports: allUserLost.length,
+      totalFoundReports: allUserFound.length,
+      claimsSubmitted: allUserClaims.length,
+      itemsRecovered: itemsRecoveredCount,
+    };
+
+    const historyMap = new Map();
+
+    userRecoveredClaims.forEach((c) => {
+      const found = (typeof c.foundItemId === 'object' && c.foundItemId) || {};
+      const lost = (typeof c.lostItemId === 'object' && c.lostItemId) || {};
+      const answers = c.verificationAnswers || {};
+
+      let itemName = found.itemName || lost.itemName;
+      if (!itemName && answers.brand) {
+        itemName = `${answers.brand.charAt(0).toUpperCase() + answers.brand.slice(1)} Item`;
+      }
+      if (!itemName) itemName = 'Recovered Belonging';
+
+      const category = found.category || lost.category || 'Personal Belonging';
+
+      historyMap.set(String(c._id), {
+        id: c._id,
+        itemName,
+        category,
+        recoveredDate: c.reviewedAt || c.updatedAt || c.createdAt || new Date(),
+        status: 'Item Returned',
+      });
+    });
+
+    userRecoveredLost.forEach((l) => {
+      const lId = String(l._id);
+      if (!historyMap.has(lId)) {
+        historyMap.set(lId, {
+          id: l._id,
+          itemName: l.itemName || 'Recovered Belonging',
+          category: l.category || 'General',
+          recoveredDate: l.updatedAt || l.createdAt || new Date(),
+          status: 'Item Returned',
+        });
+      }
+    });
+
+    const returnedHistory = Array.from(historyMap.values());
 
     return res.status(200).json({
       success: true,
@@ -301,128 +421,133 @@ const getDashboardData = async (req, res) => {
     let recoveredCount = 0;
     let recentActivity = [];
 
+    let dbLostItems = [];
+    let dbFoundItems = [];
+    let dbClaims = [];
+
     if (isDbConnected) {
-      const [lostItems, foundItems, pendingClaims, matches, recoveredLost, recoveredFound] = await Promise.all([
-        LostItem.find().sort({ createdAt: -1 }),
-        FoundItem.find({ status: { $ne: 'closed' } }).sort({ createdAt: -1 }),
-        Claim.countDocuments({ status: 'pending' }),
-        Match.countDocuments({ status: 'potential_match' }),
-        LostItem.countDocuments({ status: 'recovered' }),
-        FoundItem.countDocuments({ status: { $in: ['claimed', 'returned'] } }),
-      ]);
+      dbLostItems = await LostItem.find().sort({ createdAt: -1 }).catch(() => []);
+      dbFoundItems = await FoundItem.find({ status: { $ne: 'closed' } }).sort({ createdAt: -1 }).catch(() => []);
+      dbClaims = await Claim.find().catch(() => []);
+    }
 
-      lostCount = lostItems.length;
-      matchCount = matches;
-      claimCount = pendingClaims;
-      recoveredCount = recoveredLost + recoveredFound;
+    // Combine Lost Items
+    const lostMap = new Map();
+    dbLostItems.forEach((i) => lostMap.set(String(i._id), i.toObject ? i.toObject() : { ...i }));
+    inMemoryLostItems.forEach((i) => {
+      const iId = String(i._id);
+      if (!lostMap.has(iId)) lostMap.set(iId, i);
+      else if (i.status) lostMap.get(iId).status = i.status;
+    });
+    const combinedLost = Array.from(lostMap.values());
 
-      const lostActivities = lostItems.map((item) => {
-        let displayStatus = 'Searching';
-        let statusClass = 'status-lost';
-        if (item.status === 'searching') {
-          displayStatus = 'Searching';
-          statusClass = 'status-lost';
-        } else if (item.status === 'potential_match') {
-          displayStatus = 'Matched';
-          statusClass = 'status-matched';
-        } else if (item.status === 'claimed' || item.status === 'recovered') {
-          displayStatus = 'Recovered';
-          statusClass = 'status-claimed';
-        } else if (item.status) {
-          displayStatus = item.status.charAt(0).toUpperCase() + item.status.slice(1);
+    // Combine Found Items
+    const foundMap = new Map();
+    dbFoundItems.forEach((i) => foundMap.set(String(i._id), i.toObject ? i.toObject() : { ...i }));
+    inMemoryFoundItems.forEach((i) => {
+      const iId = String(i._id);
+      if (!foundMap.has(iId)) foundMap.set(iId, i);
+      else if (i.status) foundMap.get(iId).status = i.status;
+    });
+    const combinedFound = Array.from(foundMap.values());
+
+    // Combine Claims
+    const claimsMap = new Map();
+    dbClaims.forEach((c) => claimsMap.set(String(c._id), c.toObject ? c.toObject() : { ...c }));
+    inMemoryClaims.forEach((c) => {
+      const cId = String(c._id);
+      if (claimsMap.has(cId)) {
+        if (c.status) claimsMap.get(cId).status = c.status;
+      } else {
+        claimsMap.set(cId, c);
+      }
+    });
+    const combinedClaims = Array.from(claimsMap.values());
+
+    lostCount = combinedLost.length;
+    claimCount = combinedClaims.filter((c) => ['pending', 'under_review'].includes((c.status || '').toLowerCase())).length;
+
+    const recoveredClaims = combinedClaims.filter((c) => ['completed', 'recovered', 'returned', 'approved'].includes((c.status || '').toLowerCase())).length;
+    const recoveredLost = combinedLost.filter((i) => ['recovered', 'claimed'].includes((i.status || '').toLowerCase())).length;
+    const recoveredFound = combinedFound.filter((i) => ['claimed', 'returned'].includes((i.status || '').toLowerCase())).length;
+
+    recoveredCount = Math.max(recoveredClaims, recoveredLost, recoveredFound);
+
+    // Potential matches
+    matchCount = 0;
+    combinedLost.forEach((lost) => {
+      combinedFound.forEach((found) => {
+        if (
+          lost.category &&
+          found.category &&
+          lost.category.toLowerCase() === found.category.toLowerCase()
+        ) {
+          matchCount++;
         }
-
-        return {
-          id: item._id.toString(),
-          item: item.itemName,
-          location: item.specificLocation ? `${item.location} (${item.specificLocation})` : item.location,
-          date: item.createdAt || item.lostDate,
-          status: displayStatus,
-          statusClass,
-          type: 'Lost',
-          createdAt: new Date(item.createdAt || item.lostDate),
-        };
       });
+    });
 
-      const foundActivities = foundItems.map((item) => {
-        let displayStatus = 'Found';
-        let statusClass = 'status-found';
-        if (item.status === 'reported') {
-          displayStatus = 'Found';
-          statusClass = 'status-found';
-        } else if (item.status === 'matched') {
-          displayStatus = 'Matched';
-          statusClass = 'status-matched';
-        } else if (item.status === 'claimed' || item.status === 'returned') {
-          displayStatus = 'Claimed';
-          statusClass = 'status-claimed';
-        } else if (item.status) {
-          displayStatus = item.status.charAt(0).toUpperCase() + item.status.slice(1);
-        }
+    const lostActivities = combinedLost.map((item) => {
+      let displayStatus = 'Searching';
+      let statusClass = 'status-lost';
+      const st = (item.status || '').toLowerCase();
+      if (st === 'searching') {
+        displayStatus = 'Searching';
+        statusClass = 'status-lost';
+      } else if (st === 'potential_match' || st === 'matched') {
+        displayStatus = 'Matched';
+        statusClass = 'status-matched';
+      } else if (st === 'claimed' || st === 'recovered') {
+        displayStatus = 'Recovered';
+        statusClass = 'status-claimed';
+      } else if (item.status) {
+        displayStatus = item.status.charAt(0).toUpperCase() + item.status.slice(1);
+      }
 
-        return {
-          id: item._id.toString(),
-          item: item.itemName,
-          location: item.specificLocation ? `${item.location} (${item.specificLocation})` : item.location,
-          date: item.createdAt || item.foundDate,
-          status: displayStatus,
-          statusClass,
-          type: 'Found',
-          createdAt: new Date(item.createdAt || item.foundDate),
-        };
-      });
-
-      recentActivity = [...lostActivities, ...foundActivities].sort(
-        (a, b) => b.createdAt.getTime() - a.createdAt.getTime()
-      );
-    } else {
-      // In-Memory Dev Store Mode
-      lostCount = inMemoryLostItems.length;
-      claimCount = inMemoryClaims.filter((c) => c && c.status === 'pending').length;
-      recoveredCount =
-        inMemoryLostItems.filter((i) => i.status === 'recovered').length +
-        inMemoryFoundItems.filter((i) => ['claimed', 'returned'].includes(i.status)).length;
-
-      // Calculate potential matches in inMemory Store
-      matchCount = 0;
-      inMemoryLostItems.forEach((lost) => {
-        inMemoryFoundItems.forEach((found) => {
-          if (
-            lost.category &&
-            found.category &&
-            lost.category.toLowerCase() === found.category.toLowerCase()
-          ) {
-            matchCount++;
-          }
-        });
-      });
-
-      const lostActivities = inMemoryLostItems.map((item) => ({
-        id: item._id ? item._id.toString() : 'lost_' + Date.now(),
+      return {
+        id: String(item._id),
         item: item.itemName,
         location: item.specificLocation ? `${item.location} (${item.specificLocation})` : item.location,
         date: item.createdAt || item.lostDate,
-        status: item.status === 'searching' ? 'Searching' : item.status,
-        statusClass: item.status === 'searching' ? 'status-lost' : 'status-matched',
+        status: displayStatus,
+        statusClass,
         type: 'Lost',
         createdAt: new Date(item.createdAt || item.lostDate || Date.now()),
-      }));
+      };
+    });
 
-      const foundActivities = inMemoryFoundItems.map((item) => ({
-        id: item._id ? item._id.toString() : 'found_' + Date.now(),
+    const foundActivities = combinedFound.map((item) => {
+      let displayStatus = 'Found';
+      let statusClass = 'status-found';
+      const st = (item.status || '').toLowerCase();
+      if (st === 'reported') {
+        displayStatus = 'Found';
+        statusClass = 'status-found';
+      } else if (st === 'matched') {
+        displayStatus = 'Matched';
+        statusClass = 'status-matched';
+      } else if (st === 'claimed' || st === 'returned') {
+        displayStatus = 'Claimed';
+        statusClass = 'status-claimed';
+      } else if (item.status) {
+        displayStatus = item.status.charAt(0).toUpperCase() + item.status.slice(1);
+      }
+
+      return {
+        id: String(item._id),
         item: item.itemName,
         location: item.specificLocation ? `${item.location} (${item.specificLocation})` : item.location,
         date: item.createdAt || item.foundDate,
-        status: item.status === 'reported' ? 'Found' : item.status,
-        statusClass: item.status === 'reported' ? 'status-found' : 'status-claimed',
+        status: displayStatus,
+        statusClass,
         type: 'Found',
         createdAt: new Date(item.createdAt || item.foundDate || Date.now()),
-      }));
+      };
+    });
 
-      recentActivity = [...lostActivities, ...foundActivities].sort(
-        (a, b) => b.createdAt.getTime() - a.createdAt.getTime()
-      );
-    }
+    recentActivity = [...lostActivities, ...foundActivities].sort(
+      (a, b) => b.createdAt.getTime() - a.createdAt.getTime()
+    );
 
     return res.status(200).json({
       success: true,
@@ -451,3 +576,4 @@ module.exports = {
   changePassword,
   getDashboardData,
 };
+

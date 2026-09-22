@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import api from '../services/api';
 
 const CATEGORY_OPTIONS = [
@@ -67,9 +67,9 @@ const ReportFound = ({ onReturnToDashboard }) => {
     specialFeature: '',
     damage: '',
     privateDescription: '',
-    imageUrl: '',
   });
 
+  const [imageFile, setImageFile] = useState(null);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [submittedReport, setSubmittedReport] = useState(null);
@@ -81,6 +81,12 @@ const ReportFound = ({ onReturnToDashboard }) => {
       [name]: value,
     }));
     if (error) setError('');
+  };
+
+  const handleFileChange = (e) => {
+    if (e.target.files && e.target.files[0]) {
+      setImageFile(e.target.files[0]);
+    }
   };
 
   const handleSubmit = async (e) => {
@@ -96,7 +102,9 @@ const ReportFound = ({ onReturnToDashboard }) => {
     let selectedLocation = formData.location;
     if (formData.location === 'Classroom') {
       if (!formData.classroomBlock) {
-        setError('Please select the classroom block (A block, B block, C block, D block, or Tifac core).');
+        setError(
+          'Please select the classroom block (A block, B block, C block, D block, or Tifac core).'
+        );
         return;
       }
       selectedLocation = `Classroom (${formData.classroomBlock})`;
@@ -131,35 +139,45 @@ const ReportFound = ({ onReturnToDashboard }) => {
     setLoading(true);
 
     try {
-      const payload = {
-        category: selectedCategory,
-        itemName: formData.itemName.trim(),
-        location: selectedLocation,
-        specificLocation: formData.specificLocation.trim(),
-        foundDate: formData.foundDate,
-        foundTime: formData.foundTime,
-        timeRange: formData.timeRange.trim(),
-        brand: formData.brand.trim(),
-        colour: formData.colour.trim(),
-        uniqueMark: formData.uniqueMark.trim(),
-        specialFeature: formData.specialFeature.trim(),
-        damage: formData.damage.trim(),
-        privateDescription: formData.privateDescription.trim(),
-        imageUrl: formData.imageUrl,
-      };
+      // Build multipart FormData payload for Cloudinary upload
+      const data = new FormData();
+      data.append('category', selectedCategory);
+      data.append('itemName', formData.itemName.trim());
+      data.append('location', selectedLocation);
+      data.append('specificLocation', formData.specificLocation.trim());
+      data.append('foundDate', formData.foundDate);
+      data.append('foundTime', formData.foundTime);
+      data.append('timeRange', formData.timeRange.trim());
+      data.append('brand', formData.brand.trim());
+      data.append('colour', formData.colour.trim());
+      data.append('uniqueMark', formData.uniqueMark.trim());
+      data.append('specialFeature', formData.specialFeature.trim());
+      data.append('damage', formData.damage.trim());
+      data.append('privateDescription', formData.privateDescription.trim());
 
-      const response = await api.post('/found-items', payload);
+      if (imageFile) {
+        data.append('image', imageFile); // Multer middleware expects 'image'
+      }
+
+      // Execute request with multipart/form-data header
+      const response = await api.post('/found-items', data, {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+        },
+      });
 
       if (response.data.success) {
         setSubmittedReport(response.data.data);
       } else {
-        setError(response.data.message || 'Failed to submit found item report.');
+        setError(
+          response.data.message || 'Failed to submit found item report.'
+        );
       }
     } catch (err) {
       console.error('Submit found item error:', err);
       setError(
         err.response?.data?.message ||
-          'Server error while submitting found item report. Please try again.'
+        'Server error while submitting found item report. Please try again.'
       );
     } finally {
       setLoading(false);
@@ -185,8 +203,8 @@ const ReportFound = ({ onReturnToDashboard }) => {
       specialFeature: '',
       damage: '',
       privateDescription: '',
-      imageUrl: '',
     });
+    setImageFile(null);
     setError('');
   };
 
@@ -196,18 +214,37 @@ const ReportFound = ({ onReturnToDashboard }) => {
 
     return (
       <div className="form-page-container">
-        <div className="glass-card success-card" style={{ maxWidth: '640px', margin: '2rem auto', textAlign: 'center' }}>
-          <div className="success-icon-badge" style={{ fontSize: '3.5rem', marginBottom: '1rem' }}>
+        <div
+          className="glass-card success-card"
+          style={{ maxWidth: '640px', margin: '2rem auto', textAlign: 'center' }}
+        >
+          <div
+            className="success-icon-badge"
+            style={{ fontSize: '3.5rem', marginBottom: '1rem' }}
+          >
             📦
           </div>
-          <h2 style={{ fontSize: '2rem', fontWeight: '800', marginBottom: '0.75rem', color: '#10b981' }}>
+          <h2
+            style={{
+              fontSize: '2rem',
+              fontWeight: '800',
+              marginBottom: '0.75rem',
+              color: '#10b981',
+            }}
+          >
             Found item reported successfully.
           </h2>
-          <p style={{ color: '#94a3b8', fontSize: '1.05rem', marginBottom: '1.5rem' }}>
+          <p
+            style={{
+              color: '#94a3b8',
+              fontSize: '1.05rem',
+              marginBottom: '1.5rem',
+            }}
+          >
             Your found item report has been created and registered in the system.
           </p>
 
-          <div 
+          <div
             style={{
               background: 'rgba(168, 85, 247, 0.1)',
               border: '1px solid rgba(168, 85, 247, 0.3)',
@@ -216,26 +253,56 @@ const ReportFound = ({ onReturnToDashboard }) => {
               marginBottom: '2rem',
             }}
           >
-            <span style={{ fontSize: '0.9rem', color: '#c084fc', fontWeight: '600', display: 'block', marginBottom: '0.25rem' }}>
+            <span
+              style={{
+                fontSize: '0.9rem',
+                color: '#c084fc',
+                fontWeight: '600',
+                display: 'block',
+                marginBottom: '0.25rem',
+              }}
+            >
               REPORT ID
             </span>
-            <strong style={{ fontSize: '1.5rem', letterSpacing: '0.05em', color: '#ffffff' }}>
+            <strong
+              style={{
+                fontSize: '1.5rem',
+                letterSpacing: '0.05em',
+                color: '#ffffff',
+              }}
+            >
               {reportId}
             </strong>
           </div>
 
-          <div style={{ display: 'flex', gap: '1rem', justifyContent: 'center', flexWrap: 'wrap' }}>
+          <div
+            style={{
+              display: 'flex',
+              gap: '1rem',
+              justifyContent: 'center',
+              flexWrap: 'wrap',
+            }}
+          >
             <button
               onClick={handleReturnToDashboard}
               className="btn-register-glow"
-              style={{ padding: '0.8rem 2rem', fontSize: '1rem', border: 'none', cursor: 'pointer' }}
+              style={{
+                padding: '0.8rem 2rem',
+                fontSize: '1rem',
+                border: 'none',
+                cursor: 'pointer',
+              }}
             >
               Return to Dashboard
             </button>
             <button
               onClick={handleResetForm}
               className="btn-outline"
-              style={{ padding: '0.8rem 2rem', borderRadius: '14px', cursor: 'pointer' }}
+              style={{
+                padding: '0.8rem 2rem',
+                borderRadius: '14px',
+                cursor: 'pointer',
+              }}
             >
               Report Another Found Item
             </button>
@@ -250,19 +317,33 @@ const ReportFound = ({ onReturnToDashboard }) => {
       <div className="glass-card" style={{ maxWidth: '780px', margin: '0 auto' }}>
         <div className="form-header" style={{ marginBottom: '2rem' }}>
           <div className="badge-pill" style={{ marginBottom: '0.75rem' }}>
-            <span className="badge-dot" style={{ backgroundColor: '#10b981', boxShadow: '0 0 8px #10b981' }}></span> Report Found Item
+            <span
+              className="badge-dot"
+              style={{
+                backgroundColor: '#10b981',
+                boxShadow: '0 0 8px #10b981',
+              }}
+            ></span>{' '}
+            Report Found Item
           </div>
-          <h1 className="hero-heading" style={{ fontSize: '2.2rem', marginBottom: '0.5rem' }}>
+          <h1
+            className="hero-heading"
+            style={{ fontSize: '2.2rem', marginBottom: '0.5rem' }}
+          >
             <span className="heading-white">Report a</span>{' '}
             <span className="heading-gradient">Found Item</span>
           </h1>
           <p style={{ color: '#94a3b8', fontSize: '1.05rem' }}>
-            Found something on campus? Register general details so the owner can be reunited safely.
+            Found something on campus? Register general details so the owner can
+            be reunited safely.
           </p>
         </div>
 
         {error && (
-          <div className="alert-box alert-error" style={{ marginBottom: '1.5rem' }}>
+          <div
+            className="alert-box alert-error"
+            style={{ marginBottom: '1.5rem' }}
+          >
             <span>⚠️</span> {error}
           </div>
         )}
@@ -270,12 +351,23 @@ const ReportFound = ({ onReturnToDashboard }) => {
         <form onSubmit={handleSubmit}>
           {/* SECTION 1 — ITEM */}
           <div className="form-section" style={{ marginBottom: '2.5rem' }}>
-            <h3 className="section-title" style={{ fontSize: '1.25rem', color: '#c084fc', marginBottom: '1.25rem', borderBottom: '1px solid rgba(255,255,255,0.08)', paddingBottom: '0.5rem' }}>
+            <h3
+              className="section-title"
+              style={{
+                fontSize: '1.25rem',
+                color: '#c084fc',
+                marginBottom: '1.25rem',
+                borderBottom: '1px solid rgba(255,255,255,0.08)',
+                paddingBottom: '0.5rem',
+              }}
+            >
               SECTION 1 — ITEM
             </h3>
 
             <div className="form-group" style={{ marginBottom: '1.25rem' }}>
-              <label className="form-label" htmlFor="category">Item Category <span style={{ color: '#ef4444' }}>*</span></label>
+              <label className="form-label" htmlFor="category">
+                Item Category <span style={{ color: '#ef4444' }}>*</span>
+              </label>
               <select
                 id="category"
                 name="category"
@@ -295,7 +387,10 @@ const ReportFound = ({ onReturnToDashboard }) => {
 
             {formData.category === 'Other' && (
               <div className="form-group" style={{ marginBottom: '1.25rem' }}>
-                <label className="form-label" htmlFor="customCategory">Specify Custom Category <span style={{ color: '#ef4444' }}>*</span></label>
+                <label className="form-label" htmlFor="customCategory">
+                  Specify Custom Category{' '}
+                  <span style={{ color: '#ef4444' }}>*</span>
+                </label>
                 <input
                   type="text"
                   id="customCategory"
@@ -310,7 +405,9 @@ const ReportFound = ({ onReturnToDashboard }) => {
             )}
 
             <div className="form-group" style={{ marginBottom: '1.25rem' }}>
-              <label className="form-label" htmlFor="itemName">Item Name <span style={{ color: '#ef4444' }}>*</span></label>
+              <label className="form-label" htmlFor="itemName">
+                Item Name <span style={{ color: '#ef4444' }}>*</span>
+              </label>
               <input
                 type="text"
                 id="itemName"
@@ -326,12 +423,23 @@ const ReportFound = ({ onReturnToDashboard }) => {
 
           {/* SECTION 2 — FOUND LOCATION */}
           <div className="form-section" style={{ marginBottom: '2.5rem' }}>
-            <h3 className="section-title" style={{ fontSize: '1.25rem', color: '#c084fc', marginBottom: '1.25rem', borderBottom: '1px solid rgba(255,255,255,0.08)', paddingBottom: '0.5rem' }}>
+            <h3
+              className="section-title"
+              style={{
+                fontSize: '1.25rem',
+                color: '#c084fc',
+                marginBottom: '1.25rem',
+                borderBottom: '1px solid rgba(255,255,255,0.08)',
+                paddingBottom: '0.5rem',
+              }}
+            >
               SECTION 2 — FOUND LOCATION
             </h3>
 
             <div className="form-group" style={{ marginBottom: '1.25rem' }}>
-              <label className="form-label" htmlFor="location">Campus Location <span style={{ color: '#ef4444' }}>*</span></label>
+              <label className="form-label" htmlFor="location">
+                Campus Location <span style={{ color: '#ef4444' }}>*</span>
+              </label>
               <select
                 id="location"
                 name="location"
@@ -351,7 +459,10 @@ const ReportFound = ({ onReturnToDashboard }) => {
 
             {formData.location === 'Classroom' && (
               <div className="form-group" style={{ marginBottom: '1.25rem' }}>
-                <label className="form-label" htmlFor="classroomBlock">Select Classroom Block <span style={{ color: '#ef4444' }}>*</span></label>
+                <label className="form-label" htmlFor="classroomBlock">
+                  Select Classroom Block{' '}
+                  <span style={{ color: '#ef4444' }}>*</span>
+                </label>
                 <select
                   id="classroomBlock"
                   name="classroomBlock"
@@ -372,7 +483,10 @@ const ReportFound = ({ onReturnToDashboard }) => {
 
             {formData.location === 'Other' && (
               <div className="form-group" style={{ marginBottom: '1.25rem' }}>
-                <label className="form-label" htmlFor="customLocation">Specify Custom Location <span style={{ color: '#ef4444' }}>*</span></label>
+                <label className="form-label" htmlFor="customLocation">
+                  Specify Custom Location{' '}
+                  <span style={{ color: '#ef4444' }}>*</span>
+                </label>
                 <input
                   type="text"
                   id="customLocation"
@@ -387,7 +501,9 @@ const ReportFound = ({ onReturnToDashboard }) => {
             )}
 
             <div className="form-group" style={{ marginBottom: '1.25rem' }}>
-              <label className="form-label" htmlFor="specificLocation">Specific Location</label>
+              <label className="form-label" htmlFor="specificLocation">
+                Specific Location
+              </label>
               <input
                 type="text"
                 id="specificLocation"
@@ -402,13 +518,30 @@ const ReportFound = ({ onReturnToDashboard }) => {
 
           {/* SECTION 3 — DATE AND TIME */}
           <div className="form-section" style={{ marginBottom: '2.5rem' }}>
-            <h3 className="section-title" style={{ fontSize: '1.25rem', color: '#c084fc', marginBottom: '1.25rem', borderBottom: '1px solid rgba(255,255,255,0.08)', paddingBottom: '0.5rem' }}>
+            <h3
+              className="section-title"
+              style={{
+                fontSize: '1.25rem',
+                color: '#c084fc',
+                marginBottom: '1.25rem',
+                borderBottom: '1px solid rgba(255,255,255,0.08)',
+                paddingBottom: '0.5rem',
+              }}
+            >
               SECTION 3 — DATE AND TIME
             </h3>
 
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '1.25rem' }}>
+            <div
+              style={{
+                display: 'grid',
+                gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
+                gap: '1.25rem',
+              }}
+            >
               <div className="form-group">
-                <label className="form-label" htmlFor="foundDate">Found Date <span style={{ color: '#ef4444' }}>*</span></label>
+                <label className="form-label" htmlFor="foundDate">
+                  Found Date <span style={{ color: '#ef4444' }}>*</span>
+                </label>
                 <input
                   type="date"
                   id="foundDate"
@@ -421,7 +554,9 @@ const ReportFound = ({ onReturnToDashboard }) => {
               </div>
 
               <div className="form-group">
-                <label className="form-label" htmlFor="foundTime">Approximate Found Time</label>
+                <label className="form-label" htmlFor="foundTime">
+                  Approximate Found Time
+                </label>
                 <input
                   type="time"
                   id="foundTime"
@@ -434,7 +569,9 @@ const ReportFound = ({ onReturnToDashboard }) => {
             </div>
 
             <div className="form-group" style={{ marginTop: '1.25rem' }}>
-              <label className="form-label" htmlFor="timeRange">Time Range (Optional)</label>
+              <label className="form-label" htmlFor="timeRange">
+                Time Range (Optional)
+              </label>
               <input
                 type="text"
                 id="timeRange"
@@ -447,13 +584,22 @@ const ReportFound = ({ onReturnToDashboard }) => {
             </div>
           </div>
 
-          {/* SECTION 4 — PRIVATE IDENTIFICATION DETAILS */}
+          {/* SECTION 4 — PRIVATE IDENTIFICATION DETAILS & IMAGE UPLOAD */}
           <div className="form-section" style={{ marginBottom: '2.5rem' }}>
-            <h3 className="section-title" style={{ fontSize: '1.25rem', color: '#c084fc', marginBottom: '1.25rem', borderBottom: '1px solid rgba(255,255,255,0.08)', paddingBottom: '0.5rem' }}>
+            <h3
+              className="section-title"
+              style={{
+                fontSize: '1.25rem',
+                color: '#c084fc',
+                marginBottom: '1.25rem',
+                borderBottom: '1px solid rgba(255,255,255,0.08)',
+                paddingBottom: '0.5rem',
+              }}
+            >
               SECTION 4 — PRIVATE IDENTIFICATION DETAILS
             </h3>
 
-            <div 
+            <div
               style={{
                 background: 'rgba(99, 102, 241, 0.1)',
                 border: '1px solid rgba(99, 102, 241, 0.3)',
@@ -464,7 +610,7 @@ const ReportFound = ({ onReturnToDashboard }) => {
                 alignItems: 'center',
                 gap: '0.75rem',
                 color: '#a5b4fc',
-                fontSize: '0.95rem'
+                fontSize: '0.95rem',
               }}
             >
               <span style={{ fontSize: '1.25rem' }}>🔒</span>
@@ -473,9 +619,18 @@ const ReportFound = ({ onReturnToDashboard }) => {
               </span>
             </div>
 
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '1.25rem', marginBottom: '1.25rem' }}>
+            <div
+              style={{
+                display: 'grid',
+                gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
+                gap: '1.25rem',
+                marginBottom: '1.25rem',
+              }}
+            >
               <div className="form-group">
-                <label className="form-label" htmlFor="brand">Brand</label>
+                <label className="form-label" htmlFor="brand">
+                  Brand
+                </label>
                 <input
                   type="text"
                   id="brand"
@@ -488,7 +643,9 @@ const ReportFound = ({ onReturnToDashboard }) => {
               </div>
 
               <div className="form-group">
-                <label className="form-label" htmlFor="colour">Colour</label>
+                <label className="form-label" htmlFor="colour">
+                  Colour
+                </label>
                 <input
                   type="text"
                   id="colour"
@@ -502,7 +659,9 @@ const ReportFound = ({ onReturnToDashboard }) => {
             </div>
 
             <div className="form-group" style={{ marginBottom: '1.25rem' }}>
-              <label className="form-label" htmlFor="uniqueMark">Unique Mark</label>
+              <label className="form-label" htmlFor="uniqueMark">
+                Unique Mark
+              </label>
               <input
                 type="text"
                 id="uniqueMark"
@@ -515,7 +674,9 @@ const ReportFound = ({ onReturnToDashboard }) => {
             </div>
 
             <div className="form-group" style={{ marginBottom: '1.25rem' }}>
-              <label className="form-label" htmlFor="specialFeature">Special Feature</label>
+              <label className="form-label" htmlFor="specialFeature">
+                Special Feature
+              </label>
               <input
                 type="text"
                 id="specialFeature"
@@ -528,7 +689,9 @@ const ReportFound = ({ onReturnToDashboard }) => {
             </div>
 
             <div className="form-group" style={{ marginBottom: '1.25rem' }}>
-              <label className="form-label" htmlFor="damage">Scratch / Damage</label>
+              <label className="form-label" htmlFor="damage">
+                Scratch / Damage
+              </label>
               <input
                 type="text"
                 id="damage"
@@ -540,8 +703,10 @@ const ReportFound = ({ onReturnToDashboard }) => {
               />
             </div>
 
-            <div className="form-group">
-              <label className="form-label" htmlFor="privateDescription">Additional Description</label>
+            <div className="form-group" style={{ marginBottom: '1.25rem' }}>
+              <label className="form-label" htmlFor="privateDescription">
+                Additional Description
+              </label>
               <textarea
                 id="privateDescription"
                 name="privateDescription"
@@ -552,6 +717,22 @@ const ReportFound = ({ onReturnToDashboard }) => {
                 onChange={handleChange}
                 style={{ resize: 'vertical' }}
               ></textarea>
+            </div>
+
+            {/* IMAGE UPLOAD FIELD */}
+            <div className="form-group">
+              <label className="form-label" htmlFor="image">
+                Item Photo (Optional)
+              </label>
+              <input
+                type="file"
+                id="image"
+                name="image"
+                accept="image/*"
+                className="form-input"
+                onChange={handleFileChange}
+                style={{ padding: '0.6rem' }}
+              />
             </div>
           </div>
 

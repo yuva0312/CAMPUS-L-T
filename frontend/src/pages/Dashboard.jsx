@@ -76,8 +76,38 @@ const Dashboard = () => {
   };
 
   useEffect(() => {
-    fetchNotifications();
-    fetchDashboardData();
+    let isMounted = true;
+
+    const loadDashboard = async () => {
+      if (isMounted) {
+        await Promise.all([fetchNotifications(), fetchDashboardData()]);
+      }
+    };
+
+    loadDashboard();
+
+    const handleUpdate = () => {
+      if (isMounted) {
+        fetchNotifications();
+        fetchDashboardData();
+      }
+    };
+
+    window.addEventListener('claimStatusChanged', handleUpdate);
+    window.addEventListener('dashboardStatsUpdated', handleUpdate);
+    window.addEventListener('focus', handleUpdate);
+
+    const intervalId = setInterval(() => {
+      handleUpdate();
+    }, 3000);
+
+    return () => {
+      isMounted = false;
+      window.removeEventListener('claimStatusChanged', handleUpdate);
+      window.removeEventListener('dashboardStatsUpdated', handleUpdate);
+      window.removeEventListener('focus', handleUpdate);
+      clearInterval(intervalId);
+    };
   }, []);
 
   const formatTimeAgo = (dateInput) => {
